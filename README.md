@@ -1,1 +1,0 @@
-# groundstation-backend-java
