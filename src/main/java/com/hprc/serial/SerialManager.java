@@ -19,10 +19,10 @@ import java.util.stream.Collectors;
 public class SerialManager {
     private Logger logger = LoggerFactory.getLogger("SerialManager");
     private int timeout;
-    private static SerialPort comPort;
+    private SerialPort comPort;
     private OnData onSerialReceived;
     private OnDisconnect onSerialDisconnect;
-    private List<Object> identifiers;
+    private List<Identifier> identifiers;
 
     public SerialManager(int timeout, int byteLength) {
         this.timeout = timeout;
@@ -38,7 +38,7 @@ public class SerialManager {
     }
 
     public void getInfo() {
-        System.out.println(identifiers);
+        System.out.println(identifiers.get(0).name);
     }
 
     public synchronized void startStream() throws IOException {

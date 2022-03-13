@@ -24,6 +24,6 @@ public class Main {
         serialManager.addIdentifier(new int[]{4,3,2,1} , "Test", DataTypes.FLOAT);
         serialManager.addIdentifier(new int[]{4,3,2,1}, "Test2", DataTypes.FLOAT);
         serialManager.startStream();
-        //serialManager.getInfo();
+        serialManager.getInfo();
     }
 }
