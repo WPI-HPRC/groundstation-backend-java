@@ -3,6 +3,7 @@ package com.hprc.serial;
 import com.fazecast.jSerialComm.SerialPort;
 import com.hprc.serial.listeners.OnData;
 import com.hprc.serial.listeners.OnDisconnect;
+import com.hprc.serial.listeners.OnPacket;
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,9 +11,7 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 /**
  * @author Daniel Pearson
@@ -23,16 +22,19 @@ public class SerialManager {
 
     private SerialPort comPort;
     private int baudRate;
+    public static int packetSize;
 
     private OnData onSerialReceived;
     private OnDisconnect onSerialDisconnect;
+    private OnPacket onPacketReceived;
 
     public static List<Identifier> identifiers;
-    private static HashMap<String, Object> telemetry = new HashMap<>();
+    public static HashMap<String, Object> telemetry = new HashMap<>();
 
     public SerialManager() {
         onSerialReceived = new OnData(comPort, logger); //Event listener for data receiving
         onSerialDisconnect = new OnDisconnect(comPort, logger); //Event listener for com disconnects
+        onPacketReceived = new OnPacket(comPort, logger);
 
         identifiers = new ArrayList<>();
     }
@@ -46,12 +48,11 @@ public class SerialManager {
     }
 
     /**
-     * Hashmap of telemetry data
-     * Dependent on identifiers, if no identifiers are added, this WILL NOT RETURN ANYTHING
-     * @return returns data which has been retrieved from the serial stream
+     * Configuration method to set packet size
+     * @param packetSize Specified packet size
      */
-    public HashMap<String, Object> getTelemetry() {
-        return telemetry;
+    public void setPacketSize(int packetSize) {
+        this.packetSize = packetSize;
     }
 
     /**
@@ -104,6 +105,7 @@ public class SerialManager {
 
         //Com port configuration
         comPort.setBaudRate(baudRate);
+        comPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING, 0, 0);
 
         //Open the com port and add the data listeners
         comPort.openPort();
@@ -111,8 +113,21 @@ public class SerialManager {
             logger.error("Port not able to open...");
         }
 
-        comPort.addDataListener(onSerialReceived);
-        comPort.addDataListener(onSerialDisconnect);
+        try {
+            while(true) {
+                byte[] byteBuffer = new byte[22];
+                int numRead  = comPort.readBytes(byteBuffer,byteBuffer.length);
+                System.out.println(Arrays.asList(ArrayUtils.toObject(byteBuffer)));
+                System.out.println("Read " + numRead + " bytes!");
+            }
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+        comPort.closePort();
+
+        //comPort.addDataListener(onSerialReceived);
+        //comPort.addDataListener(onPacketReceived);
+        //comPort.addDataListener(onSerialDisconnect);
     }
 
     /**

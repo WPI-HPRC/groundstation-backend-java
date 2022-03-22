@@ -1,9 +1,11 @@
 package com.hprc.serial.listeners;
 
-import com.fazecast.jSerialComm.SerialPort;
-import com.fazecast.jSerialComm.SerialPortDataListener;
 import com.fazecast.jSerialComm.SerialPortEvent;
+import com.fazecast.jSerialComm.SerialPortPacketListener;
+import com.fazecast.jSerialComm.SerialPort;
 import com.hprc.serial.Identifier;
+import com.hprc.serial.SerialManager;
+import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -12,41 +14,42 @@ import java.util.List;
 
 import static com.hprc.serial.SerialManager.identifiers;
 
-public class OnData implements SerialPortDataListener  {
+public class OnPacket implements SerialPortPacketListener {
     private SerialPort sP;
     private Logger logger;
 
-    public OnData(SerialPort serialPort, Logger logger) {
+    public OnPacket(SerialPort serialPort, Logger logger) {
         this.sP = serialPort;
         this.logger = logger;
     }
 
     @Override
-    public int getListeningEvents() {
-        return SerialPort.LISTENING_EVENT_DATA_AVAILABLE;
+    public int getPacketSize() {
+        return SerialManager.packetSize;
     }
 
     @Override
-    public void serialEvent(SerialPortEvent serialPortEvent) {
-        /*int bytesAvailable = serialPortEvent.getSerialPort().bytesAvailable();
+    public int getListeningEvents() {
+        return SerialPort.LISTENING_EVENT_DATA_RECEIVED;
+    }
 
-        byte[] buffer = new byte[bytesAvailable];
-        List<Byte> dataList = new ArrayList<>();
+    @Override
+    public void serialEvent(SerialPortEvent event) {
+        byte[] newData = event.getReceivedData();
+        List<Byte> dataList = Arrays.asList(ArrayUtils.toObject(newData));
 
-        if(bytesAvailable > 1) {
-            serialPortEvent.getSerialPort().readBytes(buffer, bytesAvailable);
-            dataList = Arrays.asList(ArrayUtils.toObject(buffer));
-            System.out.println(dataList);
+        System.out.println(dataList);
 
-            for(Identifier identifier : identifiers) {
-                int identIdx = findIdentIdx(dataList, identifier);
+        /*for(Identifier identifier : identifiers) {
+            int identIdx = findIdentIdx(dataList,identifier);
 
-                if(identIdx != -1) {
-                    int startIdx = identIdx + identifier.identifierBytes.size();
-                    int endIdx = getNextIdentIdx(dataList, startIdx);
-                    List<Byte> valList = dataList.subList(startIdx,endIdx);
-                }
+            if(identIdx != -1) {
+                int startIdx = identIdx + identifier.identifierBytes.size();
+                int endIdx = getNextIdentIdx(dataList, identIdx);
+                List<Byte> valList = dataList.subList(startIdx, endIdx);
+                System.out.println(valList);
             }
+
         }*/
     }
 
