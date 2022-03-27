@@ -4,16 +4,15 @@ import gnu.io.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.sql.rowset.serial.SerialRef;
+import com.hprc.Conversion;
 import java.io.*;
-import java.nio.CharBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class SerialManager implements SerialPortEventListener {
     private Logger logger = LoggerFactory.getLogger("Serial Manager");
     private SerialPort comPort;
-    private int baudRate;
+    private int baudRate = 0;
 
     private InputStream input;
     private OutputStream output;
@@ -52,15 +51,12 @@ public class SerialManager implements SerialPortEventListener {
     /**
      * Testing method to log to the console each identifier which has been added to the SerialManager
      */
-    public void logInfo() {
+    public void getConfig() {
+        logger.info("Identifiers");
         for(Identifier ident : identifiers) {
             logger.info(String.format("%s - %s", ident.name, ident.identifierBytes));
         }
-        telemetry.forEach((key, value) -> {
-            System.out.println(String.format("%s - %s", key, value));
-        });
-
-        System.out.println(identifiers);
+        logger.info(String.format("Baud Rate: %s", baudRate));
     }
 
     public void startStream() throws IOException {
@@ -90,6 +86,11 @@ public class SerialManager implements SerialPortEventListener {
             if(comPortCount == portSelection) {
                 selectedIdentifier = identifier;
             }
+        }
+
+        if(baudRate == 0) {
+            logger.error("Please set a correct baud rate!");
+            System.exit(0);
         }
 
         try {
@@ -153,9 +154,16 @@ public class SerialManager implements SerialPortEventListener {
                     bytes.add(data[i]);
                 }
 
-                findIdentifiers(bytes);
-
-                //System.out.println(bytes);
+                System.out.println(bytes);
+                Map<String, Integer> identifierLocations = findIdentifiers(bytes);
+                for(int i=0; i < identifierLocations.size(); i++) {
+                    Object[] keys = identifierLocations.keySet().toArray();
+                    int startLocation = identifierLocations.get(keys[i]);
+                    int endLocation = startLocation + 4;
+                    List<Byte> telemetryData = bytes.subList(startLocation,endLocation);
+                    Conversion.twosCompliment(telemetryData);
+                    //telemetry.put(keys[i].toString(), bytes.subList(startLocation, endLocation));
+                }
 
 			} catch (Exception e) {
 				logger.error(e.toString());
@@ -163,8 +171,8 @@ public class SerialManager implements SerialPortEventListener {
 		}
     }
 
-    public void findIdentifiers(List<Byte> data) {
-
+    public Map<String, Integer> findIdentifiers(List<Byte> data) {
+        HashMap<String, Integer> map = new HashMap<>();
         for(Identifier identifier: identifiers) {
             ArrayList<Integer> idBytes = identifier.identifierBytes;
             for(int i=0; i < data.size(); i++) {
@@ -172,11 +180,20 @@ public class SerialManager implements SerialPortEventListener {
                         idBytes.get(1) == data.get(i-1).intValue() &&
                         idBytes.get(0) == data.get(i-2).intValue()
                 ) {
-
-
-
+                    int startId = i + 1;
+                    map.put(identifier.name, startId);
                 }
             }
         }
+
+        //Sorting Algorithm to sort from lowest to highest i value
+        Map<String, Integer> sorted = map.entrySet()
+                .stream()
+                .sorted(Map.Entry.comparingByValue())
+                .collect(Collectors.toMap(e -> e.getKey(),e -> e.getValue(), (e1,e2) -> e2,
+                        LinkedHashMap::new));
+
+        System.out.println(sorted);
+        return sorted;
     }
 }
