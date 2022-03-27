@@ -1,42 +1,29 @@
 package com.hprc.serial;
 
-import com.fazecast.jSerialComm.SerialPort;
-import com.hprc.serial.listeners.OnData;
-import com.hprc.serial.listeners.OnDisconnect;
-import com.hprc.serial.listeners.OnPacket;
-import org.apache.commons.lang3.ArrayUtils;
+import gnu.io.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import javax.sql.rowset.serial.SerialRef;
+import java.io.*;
+import java.nio.CharBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/**
- * @author Daniel Pearson
- * @version 3/17/2021
- */
-public class SerialManager {
-    private Logger logger = LoggerFactory.getLogger("SerialManager");
-
+public class SerialManager implements SerialPortEventListener {
+    private Logger logger = LoggerFactory.getLogger("Serial Manager");
     private SerialPort comPort;
     private int baudRate;
-    public static int packetSize;
 
-    private OnData onSerialReceived;
-    private OnDisconnect onSerialDisconnect;
-    private OnPacket onPacketReceived;
+    private InputStream input;
+    private OutputStream output;
 
     public static List<Identifier> identifiers;
     public static HashMap<String, Object> telemetry = new HashMap<>();
 
     public SerialManager() {
-        onSerialReceived = new OnData(comPort, logger); //Event listener for data receiving
-        onSerialDisconnect = new OnDisconnect(comPort, logger); //Event listener for com disconnects
-        onPacketReceived = new OnPacket(comPort, logger);
 
-        identifiers = new ArrayList<>();
+        identifiers =  new ArrayList<>();
     }
 
     /**
@@ -45,14 +32,6 @@ public class SerialManager {
      */
     public void setBaudRate(int baudRate) {
         this.baudRate = baudRate;
-    }
-
-    /**
-     * Configuration method to set packet size
-     * @param packetSize Specified packet size
-     */
-    public void setPacketSize(int packetSize) {
-        this.packetSize = packetSize;
     }
 
     /**
@@ -78,83 +57,126 @@ public class SerialManager {
             logger.info(String.format("%s - %s", ident.name, ident.identifierBytes));
         }
         telemetry.forEach((key, value) -> {
-            logger.info(String.format("%s - %s", key, value));
+            System.out.println(String.format("%s - %s", key, value));
         });
+
+        System.out.println(identifiers);
     }
 
-    /**
-     * Synchronous method to begin streaming data from the selected com port.
-     * Will prompt the user to select a com port
-     * @throws IOException Throws an exception and terminates program when no ports are available
-     */
-    public synchronized void startStream() throws IOException {
-        SerialPort[] ports = getSerialPorts();
+    public void startStream() throws IOException {
+        HashSet<CommPortIdentifier> h = getAvailableSerialPorts();
 
-        System.out.print("Select Port [0,1,2,?]: ");
+        int comPortCount = 0;
+
+        for(CommPortIdentifier identifier : h) {
+            comPortCount++;
+            logger.info(identifier.getName() + String.format(" [%s]", comPortCount));
+        }
+        System.out.print("Select Port [1,2,?]: ");
         BufferedReader reader = new BufferedReader(
                 new InputStreamReader(System.in)
         );
 
-        //Read the port selection from the user and parse
         int portSelection = Integer.parseInt(reader.readLine());
-        if(portSelection > ports.length) {
-            logger.error("Not a valid port...");
+        if(portSelection > h.size()) {
+            logger.error("Not a valid port!");
             System.exit(0);
         }
-        comPort = ports[portSelection];
 
-        //Com port configuration
-        comPort.setBaudRate(baudRate);
-        comPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING, 0, 0);
-
-        //Open the com port and add the data listeners
-        comPort.openPort();
-        if(!comPort.isOpen()) {
-            logger.error("Port not able to open...");
+        CommPortIdentifier selectedIdentifier = null;
+        comPortCount = 0;
+        for(CommPortIdentifier identifier : h) {
+            comPortCount++;
+            if(comPortCount == portSelection) {
+                selectedIdentifier = identifier;
+            }
         }
 
         try {
-            while(true) {
-                byte[] byteBuffer = new byte[22];
-                int numRead  = comPort.readBytes(byteBuffer,byteBuffer.length);
-                System.out.println(Arrays.asList(ArrayUtils.toObject(byteBuffer)));
-                System.out.println("Read " + numRead + " bytes!");
-            }
-        } catch(Exception e) {
-            e.printStackTrace();
-        }
-        comPort.closePort();
+            comPort = (SerialPort) selectedIdentifier.open(this.getClass().getName(), 2000);
+            comPort.setSerialPortParams(
+                    baudRate,
+                    SerialPort.DATABITS_8,
+                    SerialPort.STOPBITS_1,
+                    SerialPort.PARITY_NONE);
 
-        //comPort.addDataListener(onSerialReceived);
-        //comPort.addDataListener(onPacketReceived);
-        //comPort.addDataListener(onSerialDisconnect);
+            input = comPort.getInputStream();
+            output = comPort.getOutputStream();
+
+            comPort.addEventListener(this);
+            comPort.notifyOnDataAvailable(true);
+
+        } catch(Exception e) {
+            System.err.println(e);
+        }
+
     }
 
-    /**
-     * Method to obtain an array of serial ports available to the system.
-     * Note: Auto-removes com ports which are locked/in-use
-     * @return ports : array of serial port objects
-     */
-    public SerialPort[] getSerialPorts() {
-        SerialPort[] ports = SerialPort.getCommPorts();
-
-        for(int i=0; i < ports.length; i++) {
-            if(ports[i].isOpen()) {
-                ArrayUtils.remove(ports, i);
-                continue;
+    public HashSet<CommPortIdentifier> getAvailableSerialPorts() {
+        HashSet<CommPortIdentifier> h = new HashSet<CommPortIdentifier>();
+        Enumeration thePorts = CommPortIdentifier.getPortIdentifiers();
+        while (thePorts.hasMoreElements()) {
+            CommPortIdentifier com = (CommPortIdentifier) thePorts.nextElement();
+            switch (com.getPortType()) {
+            case CommPortIdentifier.PORT_SERIAL:
+                try {
+                    CommPort thePort = com.open("CommUtil", 50);
+                    thePort.close();
+                    h.add(com);
+                } catch (PortInUseException e) {
+                    System.out.println("Port, "  + com.getName() + ", is in use.");
+                } catch (Exception e) {
+                    System.err.println("Failed to open port " +  com.getName());
+                    e.printStackTrace();
+                }
             }
         }
+        return h;
+    }
 
-        if(ports.length == 0) {
-            logger.error("No Com Ports Found!");
-            System.exit(0);
+    public synchronized void close() {
+        if(comPort != null) {
+            comPort.removeEventListener();
+            comPort.close();
         }
+    }
 
-        logger.info("Serial Ports: ");
-        for(int i=0; i < ports.length; i++) {
-            logger.info(ports[i].getSystemPortName() + String.format(" [%s]", i));
+    @Override
+    public synchronized void serialEvent(SerialPortEvent serialPortEvent) {
+        if (serialPortEvent.getEventType() == SerialPortEvent.DATA_AVAILABLE) {
+			try {
+                byte[] data = new byte[input.available()];
+                input.read(data);
+
+                List<Byte> bytes = new ArrayList<>();
+                for(int i=0; i < data.length; i++) {
+                    bytes.add(data[i]);
+                }
+
+                findIdentifiers(bytes);
+
+                //System.out.println(bytes);
+
+			} catch (Exception e) {
+				logger.error(e.toString());
+			}
+		}
+    }
+
+    public void findIdentifiers(List<Byte> data) {
+
+        for(Identifier identifier: identifiers) {
+            ArrayList<Integer> idBytes = identifier.identifierBytes;
+            for(int i=0; i < data.size(); i++) {
+                if(idBytes.get(2) == data.get(i).intValue() &&
+                        idBytes.get(1) == data.get(i-1).intValue() &&
+                        idBytes.get(0) == data.get(i-2).intValue()
+                ) {
+
+
+
+                }
+            }
         }
-
-        return ports;
     }
 }
