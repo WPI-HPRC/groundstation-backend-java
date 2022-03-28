@@ -11,13 +11,22 @@ import java.util.Arrays;
 
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger("Groundstation");
-    private static final SerialManager serial = new SerialManager();
+    private static SerialManager serial = null;
+
+    static {
+        try {
+            serial = new SerialManager();
+        } catch (IOException e) {
+            logger.error(e.toString());
+        }
+    }
 
     public static void main(String[] args) throws IOException {
         logger.info("Starting Backend...");
 
         //Config
-        serial.setBaudRate(9600);
+        serial.setBaudRate(115200);
+        serial.enableLogging();
 
         serial.addIdentifier(new ArrayList<>(Arrays.asList(65,67,88)), "AccelX", DataTypes.SIGNED_INT);
         serial.addIdentifier(new ArrayList<>(Arrays.asList(65,67,89)), "AccelY", DataTypes.SIGNED_INT);
@@ -29,7 +38,6 @@ public class Main {
         serial.addIdentifier(new ArrayList<>(Arrays.asList(83,84,84)), "State", DataTypes.SIGNED_INT);
         serial.addIdentifier(new ArrayList<>(Arrays.asList(84,83,80)), "Timestamp", DataTypes.SIGNED_INT);
         serial.addIdentifier(new ArrayList<>(Arrays.asList(84,77,80)), "Temperature", DataTypes.FLOAT);
-
         serial.startStream();
         Thread t = new Thread(() -> {
             try { Thread.sleep(1000000);} catch (InterruptedException e) { logger.error(e.toString());}

@@ -28,7 +28,9 @@ public class Conversion {
     public static double toFloatIEEE754(List<Byte> data) {
         String binaryStr = toBinary(data);
 
-        return Float.intBitsToFloat(Integer.parseInt(binaryStr,2));
+        //Rounds decimal to the thousands place
+        double scale = Math.pow(10,3);
+        return Math.round((Float.intBitsToFloat(Integer.parseInt(binaryStr, 2))) * scale) / scale;
     }
 
     /**

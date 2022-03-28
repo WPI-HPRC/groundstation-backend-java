@@ -59,9 +59,19 @@
             <version>3.1</version>
         </dependency>
         <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-math3</artifactId>
+            <version>3.5</version>
+        </dependency>
+        <dependency>
             <groupId>com.neuronrobotics</groupId>
             <artifactId>nrjavaserial</artifactId>
             <version>5.2.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.opencsv</groupId>
+            <artifactId>opencsv</artifactId>
+            <version>4.1</version>
         </dependency>
 
 

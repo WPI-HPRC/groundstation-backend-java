@@ -1,11 +1,14 @@
 package com.hprc.serial;
 
+import com.opencsv.CSVWriter;
 import gnu.io.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.hprc.Conversion;
 import java.io.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -16,14 +19,27 @@ public class SerialManager implements SerialPortEventListener {
     private int baudRate = 0;
 
     private InputStream input;
-    OutputStream output;
+    OutputStream outputStream;
 
-    public static List<Identifier> identifiers;
-    public static HashMap<String, Object> telemetry = new HashMap<>();
+    private boolean loggingEnabled;
 
-    public SerialManager() {
+    public List<Identifier> identifiers;
+    public HashMap<String, Object> telemetry;
+    private final int dataLogged = 0;
+
+    private final String fileName;
+
+    public SerialManager() throws IOException {
 
         identifiers =  new ArrayList<>();
+        telemetry = new HashMap<>();
+        loggingEnabled = false;
+
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm:ss");
+        int hours = LocalDateTime.now().getHour();
+        int minutes = LocalDateTime.now().getMinute();
+        int seconds = LocalDateTime.now().getSecond();
+        fileName = String.format("%s/Desktop/%s",System.getProperty("user.home"), String.format("(%s-%s-%s)-telemetry.csv",hours,minutes,seconds));
 
     }
 
@@ -33,6 +49,13 @@ public class SerialManager implements SerialPortEventListener {
      */
     public void setBaudRate(int baudRate) {
         this.baudRate = baudRate;
+    }
+
+    /**
+     * Configuration method to enable data logging
+     */
+    public void enableLogging() {
+        this.loggingEnabled = true;
     }
 
     /**
@@ -65,7 +88,7 @@ public class SerialManager implements SerialPortEventListener {
      * Starts serial stream and updates telemetry hashmap
      * @throws IOException Throws an error if comport cannot carry out request
      */
-    public void startStream() throws IOException {
+    public synchronized void startStream() throws IOException {
         HashSet<CommPortIdentifier> h = getAvailableSerialPorts();
 
         int comPortCount = 0;
@@ -110,7 +133,7 @@ public class SerialManager implements SerialPortEventListener {
                     SerialPort.PARITY_NONE);
 
             input = comPort.getInputStream();
-            output = comPort.getOutputStream();
+            outputStream = comPort.getOutputStream();
 
             comPort.addEventListener(this);
             comPort.notifyOnDataAvailable(true);
@@ -118,6 +141,8 @@ public class SerialManager implements SerialPortEventListener {
         } catch(Exception e) {
             logger.error(e.toString());
         }
+
+
 
     }
 
@@ -156,6 +181,46 @@ public class SerialManager implements SerialPortEventListener {
             comPort.close();
         }
     }
+
+    public void writeTelemetry() throws IOException {
+
+        CSVWriter writer = new CSVWriter(new FileWriter(fileName, true));
+        String[] testStr = new String[]{"A","B","C","D"};
+        String[] str2 = new String[]{"E","F","G","H"};
+
+        writer.writeNext(testStr);
+        writer.writeNext(str2);
+        writer.close();
+
+    }
+
+    /*public synchronized void writeTelemetry() throws IOException {
+
+        CSVWriter writer = new CSVWriter()
+
+        List<String> keys = new ArrayList<>();
+        for(Identifier ident : identifiers) {
+            keys.add(ident.name);
+        }
+
+        //Only write the header once per file!
+        if(dataLogged == 0) {
+            String[] headerArr = keys.toArray(new String[keys.size()]);
+            fWriter.writeNext(headerArr);
+        }
+
+        List<String> data = new ArrayList<>();
+        for(int i=0; i < telemetry.size(); i++) {
+            data.add(telemetry.get(keys.get(i)).toString());
+        }
+        String[] dataArr = data.toArray(new String[data.size()]);
+
+        if(!(fWriter == null)) {
+            fWriter.writeNext(dataArr);
+        }
+
+        dataLogged++;
+    }*/
 
     /**
      * Overridden method from the serial port listener, called when the serial port receives a packet of data
@@ -198,6 +263,10 @@ public class SerialManager implements SerialPortEventListener {
                 }
 
                 System.out.println(telemetry);
+
+                if(loggingEnabled) {
+                    writeTelemetry();
+                }
 
 			} catch (Exception e) {
 				logger.error(e.toString());
