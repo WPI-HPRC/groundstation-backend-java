@@ -1,5 +1,0 @@
-com\hprc\serial\SerialManager.class
-com\hprc\serial\listeners\OnDisconnect.class
-com\hprc\Main.class
-com\hprc\serial\listeners\OnData.class
-com\hprc\serial\DataTypes.class

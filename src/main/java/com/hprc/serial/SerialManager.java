@@ -1,5 +1,7 @@
 package com.hprc.serial;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hprc.TelemetryServer;
 import com.opencsv.CSVWriter;
 import gnu.io.*;
 import org.slf4j.Logger;
@@ -24,10 +26,14 @@ public class SerialManager implements SerialPortEventListener {
     private boolean loggingEnabled;
 
     public List<Identifier> identifiers;
-    public HashMap<String, Object> telemetry;
-    private final int dataLogged = 0;
+    public Map<String, Object> telemetry;
+    private int dataLogged = 0;
 
     private final String fileName;
+
+    CSVWriter csvWriter;
+
+    private final TelemetryServer wss;
 
     public SerialManager() throws IOException {
 
@@ -39,7 +45,12 @@ public class SerialManager implements SerialPortEventListener {
         int hours = LocalDateTime.now().getHour();
         int minutes = LocalDateTime.now().getMinute();
         int seconds = LocalDateTime.now().getSecond();
-        fileName = String.format("%s/Desktop/%s",System.getProperty("user.home"), String.format("(%s-%s-%s)-telemetry.csv",hours,minutes,seconds));
+
+        String path = new File(SerialManager.class.getProtectionDomain().getCodeSource().getLocation().getPath()).getParentFile().getPath();
+        logger.info("Log File Path: " + path);
+        fileName = String.format("%s/%s",path, String.format("(%s-%s-%s)-telemetry.csv",hours,minutes,seconds));
+
+        wss = new TelemetryServer(3005);
 
     }
 
@@ -142,8 +153,7 @@ public class SerialManager implements SerialPortEventListener {
             logger.error(e.toString());
         }
 
-
-
+        wss.start();
     }
 
     /**
@@ -182,31 +192,18 @@ public class SerialManager implements SerialPortEventListener {
         }
     }
 
-    public void writeTelemetry() throws IOException {
-
-        CSVWriter writer = new CSVWriter(new FileWriter(fileName, true));
-        String[] testStr = new String[]{"A","B","C","D"};
-        String[] str2 = new String[]{"E","F","G","H"};
-
-        writer.writeNext(testStr);
-        writer.writeNext(str2);
-        writer.close();
-
-    }
-
-    /*public synchronized void writeTelemetry() throws IOException {
-
-        CSVWriter writer = new CSVWriter()
+    public synchronized void writeTelemetry() throws IOException {
+        csvWriter = new CSVWriter(new FileWriter(fileName, true));
 
         List<String> keys = new ArrayList<>();
         for(Identifier ident : identifiers) {
             keys.add(ident.name);
         }
+        Collections.sort(keys);
 
-        //Only write the header once per file!
         if(dataLogged == 0) {
             String[] headerArr = keys.toArray(new String[keys.size()]);
-            fWriter.writeNext(headerArr);
+            csvWriter.writeNext(headerArr);
         }
 
         List<String> data = new ArrayList<>();
@@ -215,12 +212,16 @@ public class SerialManager implements SerialPortEventListener {
         }
         String[] dataArr = data.toArray(new String[data.size()]);
 
-        if(!(fWriter == null)) {
-            fWriter.writeNext(dataArr);
+        if(!(csvWriter == null)) {
+            csvWriter.writeNext(dataArr);
         }
 
         dataLogged++;
-    }*/
+
+        if(csvWriter != null) {
+            csvWriter.close();
+        }
+    }
 
     /**
      * Overridden method from the serial port listener, called when the serial port receives a packet of data
@@ -262,7 +263,11 @@ public class SerialManager implements SerialPortEventListener {
                     }
                 }
 
-                System.out.println(telemetry);
+                //System.out.println(telemetry);
+
+                String telemetryJson = new ObjectMapper().writeValueAsString(telemetry);
+
+                wss.broadcast(telemetryJson);
 
                 if(loggingEnabled) {
                     writeTelemetry();
