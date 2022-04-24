@@ -38,15 +38,13 @@ public class Main {
         serial.addIdentifier(new ArrayList<>(Arrays.asList(83,84,84)), "State", DataTypes.SIGNED_INT);
         serial.addIdentifier(new ArrayList<>(Arrays.asList(84,83,80)), "Timestamp", DataTypes.SIGNED_INT);
         serial.addIdentifier(new ArrayList<>(Arrays.asList(84,77,80)), "Temperature", DataTypes.FLOAT);
+        serial.addIdentifier(new ArrayList<>(Arrays.asList(69,78,68,66)), "EndByte", DataTypes.END_BYTES);
 
         serial.startStream();
 
         Thread t = new Thread(() -> {
-            try { Thread.sleep(1000000);} catch (InterruptedException e) { logger.error(e.toString());}
+            try { Thread.sleep(10);} catch (InterruptedException e) { logger.error(e.toString());}
         });
         t.start();
-
-
-
     }
 }

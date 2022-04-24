@@ -25,12 +25,16 @@ public class Conversion {
      * @param data List of bytes to convert to a double
      * @return double value of a decimal byte array converted using the IEE754 standard
      */
-    public static double toFloatIEEE754(List<Byte> data) {
+    public static int toFloatIEEE754(List<Byte> data) {
         String binaryStr = toBinary(data);
 
         //Rounds decimal to the thousands place
-        double scale = Math.pow(10,3);
-        return Math.round((Float.intBitsToFloat(Integer.parseInt(binaryStr, 2))) * scale) / scale;
+        //double scale = Math.pow(10,3);
+        //return Integer.parseInt(binaryStr, 2);
+        //return Float.intBitsToFloat(intBits);
+        Long l = Long.parseLong(binaryStr, 2);
+        return Math.round(Float.intBitsToFloat(l.intValue()));
+        //return Math.round((Float.intBitsToFloat(Integer.parseInt(binaryStr, 2))) * scale) / scale;
     }
 
     /**
@@ -39,8 +43,10 @@ public class Conversion {
      * @return integer value of a decimal byte array using the twos complement standard
      */
     public static int toSignedInt16(List<Byte> data) {
-        String binaryStr = toBinary(data);
 
-        return Integer.parseInt(binaryStr, 2);
+        String binary = toBinary(data);
+
+        long l = Long.parseLong(binary,2);
+        return (int) l;
     }
 }

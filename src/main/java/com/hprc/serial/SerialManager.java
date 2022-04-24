@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 
 @SuppressWarnings({"unused", "rawtypes", "SuspiciousMethodCalls"})
 public class SerialManager implements SerialPortEventListener {
-    private final Logger logger = LoggerFactory.getLogger("Serial Manager");
+    private static final Logger logger = LoggerFactory.getLogger("Serial Manager");
     private SerialPort comPort;
     private int baudRate = 0;
 
@@ -51,7 +51,6 @@ public class SerialManager implements SerialPortEventListener {
         fileName = String.format("%s/%s",path, String.format("(%s-%s-%s)-telemetry.csv",hours,minutes,seconds));
 
         wss = new TelemetryServer(3005);
-
     }
 
     /**
@@ -76,7 +75,7 @@ public class SerialManager implements SerialPortEventListener {
      * Ex: serialManager.addIdentifier(new ArrayList<>(Arrays.asList(4,3,2,1)), "Velocity", DataTypes.FLOAT);
      * @param identifierBytes Arraylist of identifier bytes
      * @param name Name of the data you are looking to find
-     * @param datatype Bit extraction method expected [int, float, string, etc.]
+     * @param datatype Bit extraction method expected [int, float, string, etc.]2
      */
     public void addIdentifier(ArrayList<Integer> identifierBytes, String name, DataTypes datatype) {
         Identifier identifier = new Identifier(identifierBytes,name,datatype);
@@ -166,15 +165,15 @@ public class SerialManager implements SerialPortEventListener {
         while (thePorts.hasMoreElements()) {
             CommPortIdentifier com = (CommPortIdentifier) thePorts.nextElement();
 
-            if(com.getPortType() == CommPortIdentifier.PORT_SERIAL) {
+            if (com.getPortType() == CommPortIdentifier.PORT_SERIAL) {
                 try {
                     CommPort thePort = com.open("CommUtil", 50);
                     thePort.close();
                     h.add(com);
                 } catch (PortInUseException e) {
-                    System.out.println("Port, "  + com.getName() + ", is in use.");
+                    logger.error(com.getName() + " is in use!");
                 } catch (Exception e) {
-                    System.err.println("Failed to open port " +  com.getName());
+                    logger.error("Failed to open port " + com.getName());
                     e.printStackTrace();
                 }
             }
@@ -242,10 +241,9 @@ public class SerialManager implements SerialPortEventListener {
 
                 Map<String, Integer> identifierLocations = findIdentifiers(bytes); //Locates all identifiers in array
                 Object[] keys = identifierLocations.keySet().toArray();
-
-                for(int i=0; i < identifierLocations.size(); i++) {
+                for(int i=0; i < identifierLocations.size()-1; i++) {
                     int startLocation = identifierLocations.get(keys[i]);
-                    int endLocation = startLocation + 4;
+                    int endLocation = identifierLocations.get(keys[i+1]) - 3;
                     List<Byte> telemetryData = bytes.subList(startLocation,endLocation);
 
                     /*
@@ -258,6 +256,8 @@ public class SerialManager implements SerialPortEventListener {
                                 telemetry.put(ident.name, Conversion.toFloatIEEE754(telemetryData));
                             } else if(ident.dataType == DataTypes.SIGNED_INT) {
                                 telemetry.put(ident.name, Conversion.toSignedInt16(telemetryData));
+                            } else if(ident.dataType == DataTypes.END_BYTES) {
+                                continue;
                             }
                         }
                     }
