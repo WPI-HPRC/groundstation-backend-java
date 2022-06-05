@@ -32,6 +32,7 @@ public class SerialManager implements SerialPortEventListener {
     private final String fileName;
 
     CSVWriter csvWriter;
+    private final ObjectMapper mapper;
 
     private final TelemetryServer wss;
 
@@ -49,6 +50,8 @@ public class SerialManager implements SerialPortEventListener {
         String path = new File(SerialManager.class.getProtectionDomain().getCodeSource().getLocation().getPath()).getParentFile().getPath();
         logger.info("Log File Path: " + path);
         fileName = String.format("%s/%s",path, String.format("(%s-%s-%s)-telemetry.csv",hours,minutes,seconds));
+
+        mapper = new ObjectMapper();
 
         wss = new TelemetryServer(3005);
     }
@@ -206,7 +209,8 @@ public class SerialManager implements SerialPortEventListener {
         }
 
         List<String> data = new ArrayList<>();
-        for(int i=0; i < telemetry.size(); i++) {
+        int telemSize = telemetry.size();
+        for(int i=0; i < telemSize; i++) {
             data.add(telemetry.get(keys.get(i)).toString());
         }
         String[] dataArr = data.toArray(new String[data.size()]);
@@ -241,7 +245,8 @@ public class SerialManager implements SerialPortEventListener {
 
                 Map<String, Integer> identifierLocations = findIdentifiers(bytes); //Locates all identifiers in array
                 Object[] keys = identifierLocations.keySet().toArray();
-                for(int i=0; i < identifierLocations.size()-1; i++) {
+                int locationsArrSize = identifierLocations.size() - 1;
+                for(int i=0; i < locationsArrSize; i++) {
                     int startLocation = identifierLocations.get(keys[i]);
                     int endLocation = identifierLocations.get(keys[i+1]) - 3;
                     List<Byte> telemetryData = bytes.subList(startLocation,endLocation);
@@ -265,7 +270,8 @@ public class SerialManager implements SerialPortEventListener {
 
                 //System.out.println(telemetry);
 
-                String telemetryJson = new ObjectMapper().writeValueAsString(telemetry);
+
+                String telemetryJson = mapper.writeValueAsString(telemetry);
 
                 wss.broadcast(telemetryJson);
 
@@ -284,11 +290,12 @@ public class SerialManager implements SerialPortEventListener {
      * @param data List of bytes of data coming in from the serial port
      * @return A map of identifiers and its correlated start position in the array, sorted from least to highest in array
      */
-    public Map<String, Integer> findIdentifiers(List<Byte> data) {
+    public synchronized Map<String, Integer> findIdentifiers(List<Byte> data) {
         HashMap<String, Integer> map = new HashMap<>();
         for(Identifier identifier: identifiers) {
             ArrayList<Integer> idBytes = identifier.identifierBytes;
-            for(int i=0; i < data.size(); i++) {
+            int dataSize = data.size();
+            for(int i=0; i < dataSize; i++) {
                 if(idBytes.get(2) == data.get(i).intValue() &&
                         idBytes.get(1) == data.get(i-1).intValue() &&
                         idBytes.get(0) == data.get(i-2).intValue()

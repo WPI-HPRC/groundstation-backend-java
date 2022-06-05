@@ -38,6 +38,7 @@ public class Main {
         serial.addIdentifier(new ArrayList<>(Arrays.asList(83,84,84)), "State", DataTypes.SIGNED_INT);
         serial.addIdentifier(new ArrayList<>(Arrays.asList(84,83,80)), "Timestamp", DataTypes.SIGNED_INT);
         serial.addIdentifier(new ArrayList<>(Arrays.asList(84,77,80)), "Temperature", DataTypes.FLOAT);
+        serial.addIdentifier(new ArrayList<>(Arrays.asList(86,79,76)), "Voltage", DataTypes.FLOAT);
         serial.addIdentifier(new ArrayList<>(Arrays.asList(69,78,68,66)), "EndByte", DataTypes.END_BYTES);
 
         serial.startStream();
