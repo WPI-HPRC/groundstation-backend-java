@@ -6,8 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
 
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger("Groundstation");
@@ -28,18 +26,18 @@ public class Main {
         serial.setBaudRate(115200);
         serial.enableLogging();
 
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(65,67,88)), "AccelX", DataTypes.SIGNED_INT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(65,67,89)), "AccelY", DataTypes.SIGNED_INT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(65,67,90)), "AccelZ", DataTypes.SIGNED_INT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(71,89,88)), "GyroX", DataTypes.SIGNED_INT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(71,89,89)), "GyroY", DataTypes.SIGNED_INT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(71,89,90)), "GyroZ", DataTypes.SIGNED_INT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(65,76,84)), "Altitude", DataTypes.FLOAT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(83,84,84)), "State", DataTypes.SIGNED_INT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(84,83,80)), "Timestamp", DataTypes.SIGNED_INT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(84,77,80)), "Temperature", DataTypes.FLOAT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(86,79,76)), "Voltage", DataTypes.FLOAT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(69,78,68,66)), "EndByte", DataTypes.END_BYTES);
+        serial.addIdentifier("ACX", "AccelX", DataTypes.SIGNED_INT);
+        serial.addIdentifier("ACY", "AccelY", DataTypes.SIGNED_INT);
+        serial.addIdentifier("ACZ", "AccelZ", DataTypes.SIGNED_INT);
+        serial.addIdentifier("GYX", "GyroX", DataTypes.SIGNED_INT);
+        serial.addIdentifier("GYY", "GyroY", DataTypes.SIGNED_INT);
+        serial.addIdentifier("GYZ", "GyroZ", DataTypes.SIGNED_INT);
+        serial.addIdentifier("ALT", "Altitude", DataTypes.FLOAT);
+        serial.addIdentifier("STT", "State", DataTypes.SIGNED_INT);
+        serial.addIdentifier("TSP", "Timestamp", DataTypes.SIGNED_INT);
+        serial.addIdentifier("TMP", "Temperature", DataTypes.FLOAT);
+        serial.addIdentifier("VOL", "Voltage", DataTypes.FLOAT);
+        serial.addIdentifier("ENDB", "EndByte", DataTypes.END_BYTES);
 
         serial.startStream();
 

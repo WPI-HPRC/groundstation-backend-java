@@ -9,10 +9,12 @@ import org.slf4j.LoggerFactory;
 
 import com.hprc.Conversion;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @SuppressWarnings({"unused", "rawtypes", "SuspiciousMethodCalls"})
 public class SerialManager implements SerialPortEventListener {
@@ -82,6 +84,25 @@ public class SerialManager implements SerialPortEventListener {
      */
     public void addIdentifier(ArrayList<Integer> identifierBytes, String name, DataTypes datatype) {
         Identifier identifier = new Identifier(identifierBytes,name,datatype);
+        identifiers.add(identifier);
+        telemetry.put(name, 0);
+    }
+
+    private ArrayList<Integer> intArrToArrList(int[] ints) {
+        return IntStream.of(ints)
+                .boxed()
+                .collect(Collectors.toCollection(ArrayList::new));
+    }
+
+    public void addIdentifier(String identifierStr, String name, DataTypes datatype) {
+        byte[] ascii = identifierStr.getBytes(StandardCharsets.US_ASCII);
+        int[] ints = new int[3];
+
+        for (int i = 0; i < ascii.length; i++) {
+            ints[i] = ascii[i];
+        }
+
+        Identifier identifier = new Identifier(intArrToArrList(ints),name,datatype);
         identifiers.add(identifier);
         telemetry.put(name, 0);
     }
