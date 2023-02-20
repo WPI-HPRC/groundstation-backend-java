@@ -65,6 +65,19 @@ public class SerialManager implements SerialPortEventListener {
     }
 
     /**
+     *
+     * @param file
+     */
+    public void fileRead(File file) throws FileNotFoundException {
+        Scanner fileScan = new Scanner(file);
+        while(fileScan.hasNextLine()) {
+            String data = fileScan.nextLine();
+            System.out.println(data);
+        }
+        fileScan.close();
+    }
+
+    /**
      * Configuration method to enable data logging
      */
     public void enableLogging() {
@@ -101,7 +114,7 @@ public class SerialManager implements SerialPortEventListener {
      * Starts serial stream and updates telemetry hashmap
      * @throws IOException Throws an error if comport cannot carry out request
      */
-    public synchronized void startStream() throws IOException {
+    public synchronized void startStream() throws IOException, InterruptedException {
         HashSet<CommPortIdentifier> h = getAvailableSerialPorts();
 
         int comPortCount = 0;
@@ -110,6 +123,14 @@ public class SerialManager implements SerialPortEventListener {
             comPortCount++;
             logger.info(identifier.getName() + String.format(" [%s]", comPortCount));
         }
+
+        //If no serial ports are found, do not continue program
+        if(comPortCount == 0) {
+            logger.info("No serial ports found...");
+            Thread.sleep(10000);
+            System.exit(0);
+        }
+
         //Prompted port selection
         System.out.print("Select Port [1,2,?]: ");
         BufferedReader reader = new BufferedReader(
@@ -243,6 +264,8 @@ public class SerialManager implements SerialPortEventListener {
                     bytes.add(datum);
                 }
 
+                //System.out.println(bytes);
+
                 Map<String, Integer> identifierLocations = findIdentifiers(bytes); //Locates all identifiers in array
                 Object[] keys = identifierLocations.keySet().toArray();
                 int locationsArrSize = identifierLocations.size() - 1;
@@ -250,17 +273,22 @@ public class SerialManager implements SerialPortEventListener {
                     int startLocation = identifierLocations.get(keys[i]);
                     int endLocation = identifierLocations.get(keys[i+1]) - 3;
                     List<Byte> telemetryData = bytes.subList(startLocation,endLocation);
+                    System.out.println(telemetryData);
 
                     /*
                       Loop identifiers and look for matches in the array
                       Coordinate data with identifiers
-                     */
+                    */
                     for(Identifier ident : identifiers) {
+
                         if(ident.name == keys[i]) {
                             if(ident.dataType == DataTypes.FLOAT) {
+
                                 telemetry.put(ident.name, Conversion.toFloatIEEE754(telemetryData));
                             } else if(ident.dataType == DataTypes.SIGNED_INT) {
                                 telemetry.put(ident.name, Conversion.toSignedInt16(telemetryData));
+                            } else if(ident.dataType == DataTypes.UNSIGNED_INT) {
+                                telemetry.put(ident.name, Conversion.toUnsignedInt(telemetryData));
                             } else if(ident.dataType == DataTypes.END_BYTES) {
                                 continue;
                             }
