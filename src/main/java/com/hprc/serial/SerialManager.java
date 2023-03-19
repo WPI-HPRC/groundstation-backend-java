@@ -124,11 +124,85 @@ public class SerialManager implements SerialPortEventListener {
             logger.info(identifier.getName() + String.format(" [%s]", comPortCount));
         }
 
-        //If no serial ports are found, do not continue program
+        //If no serial ports are found, prompt to use a predetermined file (SIMULATOR mode)
         if(comPortCount == 0) {
             logger.info("No serial ports found...");
-            Thread.sleep(10000);
-            System.exit(0);
+            logger.info("Continue in SIMULATOR mode? Y/N");
+            BufferedReader reader = new BufferedReader(
+                new InputStreamReader(System.in)
+            );
+            String line = reader.readLine();
+            if(line.equalsIgnoreCase("Y")) {
+                logger.info("Running SIMULATOR mode");
+
+                /* simulator mode, reading from a pre-existing .csv file */
+
+                File simFile = new File("C:/Users/benpe/OneDrive/Desktop/test_launch_1.csv");
+                Scanner simScanner = new Scanner(simFile);
+                String IDs = simScanner.nextLine();
+
+                logger.info(IDs);
+                String[] idArray = IDs.split(",");
+
+                int index = 0;
+
+                wss.start();
+
+                while(simScanner.hasNextLine()) {
+
+                    String nextL = simScanner.nextLine();
+                    telemetry.clear();
+                    String[] lineArray = nextL.split(",");
+                    
+                    logger.info(lineArray[0]);
+                    try {
+                        int accel_X = Integer.parseInt(lineArray[0]);
+                        int accel_Y = Integer.parseInt(lineArray[1]);
+                        int accel_Z = Integer.parseInt(lineArray[2]);
+    
+                        int gyro_X = Integer.parseInt(lineArray[4]);
+                        int gyro_Y = Integer.parseInt(lineArray[5]);
+                        int gyro_Z = Integer.parseInt(lineArray[6]);
+    
+                        float altitude = Float.parseFloat(lineArray[3]);
+                        float temperature = Float.parseFloat(lineArray[9]);
+    
+                        int state = Integer.parseInt(lineArray[8]);
+    
+                        int time = Integer.parseUnsignedInt(lineArray[11]);
+    
+                        telemetry.put("AccelX", accel_X);
+                        telemetry.put("AccelZ", accel_Y);
+                        telemetry.put("AccelY", accel_Z);
+                        telemetry.put("GyroX", gyro_X); // these are flipped for testing
+                        telemetry.put("GyroY", gyro_Y); // 
+                        telemetry.put("GyroZ", gyro_Z); // its on purpose, trust me!
+                        telemetry.put("Altitude", altitude);
+                        telemetry.put("Temperature", temperature);
+                        telemetry.put("State", state);
+                        telemetry.put("Timestamp", time);
+    
+                        String telemetryJson = mapper.writeValueAsString(telemetry);
+    
+                        wss.broadcast(telemetryJson);
+                    } catch(NumberFormatException e) {
+
+                    }
+                    
+                    
+                    Thread.sleep(100);
+
+                }
+
+                Thread.sleep(1000);
+                System.exit(0);
+
+
+            } else {
+                Thread.sleep(1000);
+                System.exit(0);
+            }
+            
         }
 
         //Prompted port selection
