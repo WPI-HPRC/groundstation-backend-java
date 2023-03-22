@@ -1,5 +1,6 @@
 package com.hprc.serial;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hprc.TelemetryServer;
 import com.opencsv.CSVWriter;
@@ -134,7 +135,6 @@ public class SerialManager implements SerialPortEventListener {
             String line = reader.readLine();
             if(line.equalsIgnoreCase("Y")) {
                 logger.info("Running SIMULATOR mode.  Please enter file path:");
-
                 /* simulator mode, reading from a pre-existing .csv file */
                 /* input the filepath */
                 BufferedReader breader = new BufferedReader(
@@ -142,7 +142,6 @@ public class SerialManager implements SerialPortEventListener {
                 );
                 String fileNameLine = breader.readLine();
 
-                
 
                 File simFile = new File(fileNameLine);
                 if(simFile.exists()) {
@@ -154,41 +153,67 @@ public class SerialManager implements SerialPortEventListener {
 
                     int index = 0;
 
-                    wss.start();
-
+                    wss.start();                
                     while(simScanner.hasNextLine()) {
 
                         String nextL = simScanner.nextLine();
                         telemetry.clear();
                         String[] lineArray = nextL.split(",");
                     
-                        logger.info(lineArray[0]);
                         try {
-                            int accel_X = Integer.parseInt(lineArray[0]);
-                            int accel_Y = Integer.parseInt(lineArray[1]);
-                            int accel_Z = Integer.parseInt(lineArray[2]);
+                            for(int colIndex = 0; colIndex < idArray.length; colIndex++) {
+                                switch(idArray[colIndex]) {
+                                    case "AccelX":
+                                        int accel_X = Integer.parseInt(lineArray[colIndex]);
+                                        telemetry.put("AccelX", accel_X);
+                                        break;
+                                    case "AccelY":
+                                        int accel_Y = Integer.parseInt(lineArray[colIndex]);
+                                        telemetry.put("AccelZ", accel_Y);
+                                        break;
+                                    case "AccelZ":
+                                        int accel_Z = Integer.parseInt(lineArray[colIndex]);
+                                        telemetry.put("AccelY", accel_Z);
+                                        break;
+                                    case "GyroX":
+                                        int gyro_X = Integer.parseInt(lineArray[colIndex]);
+                                        telemetry.put("GyroX", gyro_X); // these are flipped for testing
+                                        break;    
+                                    case "GyroY":
+                                        int gyro_Y = Integer.parseInt(lineArray[colIndex]);
+                                        telemetry.put("GyroY", gyro_Y); // 
+                                        break;
+                                    case "GyroZ":
+                                        int gyro_Z = Integer.parseInt(lineArray[colIndex]);
+                                        telemetry.put("GyroZ", gyro_Z); // its on purpose, trust me!
+                                        break;    
+                                    case "Altitude":
+                                        float altitude = Float.parseFloat(lineArray[colIndex]);
+                                        telemetry.put("Altitude", altitude);
+                                        break;    
+                                    case "Temperature":
+                                        float temperature = Float.parseFloat(lineArray[colIndex]);
+                                        telemetry.put("Temperature", temperature);
+                                        break;
+                                    case "State":
+                                        int state = Integer.parseInt(lineArray[colIndex]);
+                                        telemetry.put("State", state);
+                                        break;
+                                    case "Timestamp":
+                                        int time = Integer.parseUnsignedInt(lineArray[colIndex]);
+                                        telemetry.put("Timestamp", time);
+                                        break;
+                                    default:
+                                        float out = Float.parseFloat(lineArray[colIndex]);
+                                        telemetry.put(idArray[colIndex], out);
+                                }
+                            }
+
     
-                            int gyro_X = Integer.parseInt(lineArray[4]);
-                            int gyro_Y = Integer.parseInt(lineArray[5]);
-                            int gyro_Z = Integer.parseInt(lineArray[6]);
     
-                            float altitude = Float.parseFloat(lineArray[3]);
-                            float temperature = Float.parseFloat(lineArray[9]);
     
-                            int state = Integer.parseInt(lineArray[8]);
     
-                            int time = Integer.parseUnsignedInt(lineArray[11]);
     
-                            telemetry.put("AccelX", accel_X);
-                            telemetry.put("AccelZ", accel_Y);
-                            telemetry.put("AccelY", accel_Z);
-                            telemetry.put("GyroX", gyro_X); // these are flipped for testing
-                            telemetry.put("GyroY", gyro_Y); // 
-                            telemetry.put("GyroZ", gyro_Z); // its on purpose, trust me!
-                            telemetry.put("Altitude", altitude);
-                            telemetry.put("Temperature", temperature);
-                            telemetry.put("State", state);
-                            telemetry.put("Timestamp", time);
     
                             String telemetryJson = mapper.writeValueAsString(telemetry);
     
@@ -197,18 +222,20 @@ public class SerialManager implements SerialPortEventListener {
 
                         }
                     
-                    Thread.sleep(100);
+                    Thread.sleep(10);
 
                 }
                 }
                 
 
                 Thread.sleep(1000);
+                close();
                 System.exit(0);
 
 
             } else {
                 Thread.sleep(1000);
+                close();
                 System.exit(0);
             }
             
