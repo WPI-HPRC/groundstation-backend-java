@@ -1,5 +1,6 @@
 package com.hprc;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.hprc.serial.DataTypes;
 import com.hprc.serial.SerialManager;
 import org.slf4j.Logger;
@@ -16,6 +17,7 @@ import java.util.Arrays;
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger("Groundstation");
     private static SerialManager serial = null;
+    private static int disconnectedCount = 0;
 
     static {
         try {
@@ -31,28 +33,49 @@ public class Main {
         serial.setBaudRate(115200); //Set baudrate for serial communications
         serial.enableLogging(); //Start logging at baudrate set earlier
 
-        //serial.addIdentifier(new ArrayList<>(Arrays.asList(65,67,88)), "AccelX", DataTypes.SIGNED_INT);
-        //serial.addIdentifier(new ArrayList<>(Arrays.asList(65,67,89)), "AccelY", DataTypes.SIGNED_INT);
-        //serial.addIdentifier(new ArrayList<>(Arrays.asList(65,67,90)), "AccelZ", DataTypes.SIGNED_INT);
-        //serial.addIdentifier(new ArrayList<>(Arrays.asList(71,89,88)), "GyroX", DataTypes.SIGNED_INT);
-        //serial.addIdentifier(new ArrayList<>(Arrays.asList(71,89,89)), "GyroY", DataTypes.SIGNED_INT);
-        //serial.addIdentifier(new ArrayList<>(Arrays.asList(71,89,90)), "GyroZ", DataTypes.SIGNED_INT);
+        serial.addIdentifier(new ArrayList<>(Arrays.asList(65,67,88)), "AccelX", DataTypes.FLOAT);
+        serial.addIdentifier(new ArrayList<>(Arrays.asList(65,67,89)), "AccelY", DataTypes.FLOAT);
+        serial.addIdentifier(new ArrayList<>(Arrays.asList(65,67,90)), "AccelZ", DataTypes.FLOAT);
+        serial.addIdentifier(new ArrayList<>(Arrays.asList(71,89,88)), "GyroX", DataTypes.FLOAT);
+        serial.addIdentifier(new ArrayList<>(Arrays.asList(71,89,89)), "GyroY", DataTypes.FLOAT);
+        serial.addIdentifier(new ArrayList<>(Arrays.asList(71,89,90)), "GyroZ", DataTypes.FLOAT);
         serial.addIdentifier(new ArrayList<>(Arrays.asList(65,76,84)), "Altitude", DataTypes.FLOAT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(80,82,83)), "Pressure", DataTypes.FLOAT);
-        //serial.addIdentifier(new ArrayList<>(Arrays.asList(72,85,77)), "Humidity", DataTypes.FLOAT);
-        //serial.addIdentifier(new ArrayList<>(Arrays.asList(83,84,84)), "State", DataTypes.SIGNED_INT);
-
+        serial.addIdentifier(new ArrayList<>(Arrays.asList(83,84,84)), "State", DataTypes.UNSIGNED_INT);
         serial.addIdentifier(new ArrayList<>(Arrays.asList(84,83,80)), "Timestamp", DataTypes.UNSIGNED_INT);
-        //serial.addIdentifier(new ArrayList<>(Arrays.asList(84,77,80)), "Temperature", DataTypes.FLOAT);
-        //serial.addIdentifier(new ArrayList<>(Arrays.asList(86,79,76)), "Voltage", DataTypes.FLOAT);
-        //serial.addIdentifier(new ArrayList<>(Arrays.asList(87,78,68)), "WindSpeed", DataTypes.FLOAT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(69,78,68,66)), "EndByte", DataTypes.END_BYTES);
+        serial.addIdentifier(new ArrayList<>(Arrays.asList(84,77,80)), "Temperature", DataTypes.SIGNED_INT);
+        serial.addIdentifier(new ArrayList<>(Arrays.asList(86, 76, 84)), "Voltage", DataTypes.FLOAT);
+        serial.addIdentifier(new ArrayList<>(Arrays.asList(86, 69, 76)), "Velocity", DataTypes.SIGNED_INT);
+        serial.addIdentifier(new ArrayList<>(Arrays.asList(65, 82, 66)), "AirbrakesDeploy", DataTypes.UNSIGNED_INT);
+        serial.addIdentifier(new ArrayList<>(Arrays.asList(69,78,68,66)), "EndByte", DataTypes.IGNORE);
 
         serial.startStream(); // Start serial stream for receiver
 
         Thread t = new Thread(() -> {
-            try { Thread.sleep(10);} catch (InterruptedException e) { logger.error(e.toString());}
+            while(true) {
+                try {
+                    if(serial.comPort.getInputStream().read() == -1) {
+                        disconnectedCount++;
+                    }
+
+                    if(disconnectedCount > 2) {
+                        serial.telemetry.put("RocketConnected", false);
+                        serial.manualPushTelemetry();
+                    }
+
+                    if (serial.comPort.getInputStream().read() != -1) {
+                        disconnectedCount = 0;
+                    }
+
+                    Thread.sleep(1000);
+                } catch(InterruptedException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         });
+
         t.start();
+
     }
 }

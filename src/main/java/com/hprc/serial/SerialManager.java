@@ -1,5 +1,6 @@
 package com.hprc.serial;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hprc.TelemetryServer;
 import com.opencsv.CSVWriter;
@@ -17,7 +18,7 @@ import java.util.stream.Collectors;
 @SuppressWarnings({"unused", "rawtypes", "SuspiciousMethodCalls"})
 public class SerialManager implements SerialPortEventListener {
     private static final Logger logger = LoggerFactory.getLogger("Serial Manager");
-    private SerialPort comPort;
+    public SerialPort comPort;
     private int baudRate = 0;
 
     private InputStream input;
@@ -54,6 +55,10 @@ public class SerialManager implements SerialPortEventListener {
         mapper = new ObjectMapper();
 
         wss = new TelemetryServer(3005);
+
+        Identifier connectedIdentifier = new Identifier(new ArrayList<>(Arrays.asList(82, 79, 67, 75)), "RocketConnected", DataTypes.IGNORE);
+        identifiers.add(connectedIdentifier);
+        telemetry.put("RocketConnected", 0);
     }
 
     /**
@@ -72,7 +77,6 @@ public class SerialManager implements SerialPortEventListener {
         Scanner fileScan = new Scanner(file);
         while(fileScan.hasNextLine()) {
             String data = fileScan.nextLine();
-            System.out.println(data);
         }
         fileScan.close();
     }
@@ -220,7 +224,10 @@ public class SerialManager implements SerialPortEventListener {
 
         List<String> keys = new ArrayList<>();
         for(Identifier ident : identifiers) {
-            keys.add(ident.name);
+            if(ident.dataType != DataTypes.IGNORE) {
+                keys.add(ident.name);
+            }
+            //keys.add(ident.name);
         }
         Collections.sort(keys);
 
@@ -230,7 +237,7 @@ public class SerialManager implements SerialPortEventListener {
         }
 
         List<String> data = new ArrayList<>();
-        int telemSize = telemetry.size();
+        int telemSize = keys.size();
         for(int i=0; i < telemSize; i++) {
             data.add(telemetry.get(keys.get(i)).toString());
         }
@@ -255,7 +262,7 @@ public class SerialManager implements SerialPortEventListener {
     @Override
     public synchronized void serialEvent(SerialPortEvent serialPortEvent) {
         if (serialPortEvent.getEventType() == SerialPortEvent.DATA_AVAILABLE) {
-			try {
+            try {
                 byte[] data = new byte[input.available()]; //Creates a byte array with size of available bytes
                 int dataRead = input.read(data);
 
@@ -273,7 +280,6 @@ public class SerialManager implements SerialPortEventListener {
                     int startLocation = identifierLocations.get(keys[i]);
                     int endLocation = identifierLocations.get(keys[i+1]) - 3;
                     List<Byte> telemetryData = bytes.subList(startLocation,endLocation);
-                    System.out.println(telemetryData);
 
                     /*
                       Loop identifiers and look for matches in the array
@@ -282,14 +288,16 @@ public class SerialManager implements SerialPortEventListener {
                     for(Identifier ident : identifiers) {
 
                         if(ident.name == keys[i]) {
-                            if(ident.dataType == DataTypes.FLOAT) {
 
+//                            System.out.println(ident.name + ": " + telemetryData);
+
+                            if(ident.dataType == DataTypes.FLOAT) {
                                 telemetry.put(ident.name, Conversion.toFloatIEEE754(telemetryData));
                             } else if(ident.dataType == DataTypes.SIGNED_INT) {
                                 telemetry.put(ident.name, Conversion.toSignedInt16(telemetryData));
                             } else if(ident.dataType == DataTypes.UNSIGNED_INT) {
                                 telemetry.put(ident.name, Conversion.toUnsignedInt(telemetryData));
-                            } else if(ident.dataType == DataTypes.END_BYTES) {
+                            } else if(ident.dataType == DataTypes.IGNORE) {
                                 continue;
                             }
                         }
@@ -297,7 +305,6 @@ public class SerialManager implements SerialPortEventListener {
                 }
 
                 //System.out.println(telemetry);
-
 
                 String telemetryJson = mapper.writeValueAsString(telemetry);
 
@@ -307,10 +314,30 @@ public class SerialManager implements SerialPortEventListener {
                     writeTelemetry();
                 }
 
+                if(telemetry.containsKey("Timestamp")) {
+                    telemetry.put("RocketConnected", true);
+                }
+
 			} catch (Exception e) {
 				logger.error(e.toString());
 			}
-		}
+		} else if(serialPortEvent.getEventType() == SerialPortEvent.OUTPUT_BUFFER_EMPTY) {
+            System.out.println("SAFE");
+        }
+
+        else {
+            telemetry.put("RocketConnected", false);
+            try {
+                manualPushTelemetry();
+            } catch (JsonProcessingException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public synchronized void manualPushTelemetry() throws JsonProcessingException {
+        String telemetryJson = mapper.writeValueAsString(telemetry);
+        wss.broadcast(telemetryJson);
     }
 
     /**
@@ -323,7 +350,7 @@ public class SerialManager implements SerialPortEventListener {
         for(Identifier identifier: identifiers) {
             ArrayList<Integer> idBytes = identifier.identifierBytes;
             int dataSize = data.size();
-            for(int i=0; i < dataSize; i++) {
+            for(int i=1; i < dataSize; i++) {
                 if(idBytes.get(2) == data.get(i).intValue() &&
                         idBytes.get(1) == data.get(i-1).intValue() &&
                         idBytes.get(0) == data.get(i-2).intValue()
