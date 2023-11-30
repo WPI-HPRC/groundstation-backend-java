@@ -112,7 +112,7 @@ public class SerialManager implements SerialPortEventListener {
         logger.info(String.format("Baud Rate: %s", baudRate));
     }
 
-    private synchronized void doStream(File simFile) throws IOException, InterruptedException {
+    private synchronized void doStream(File simFile, boolean forever) throws IOException, InterruptedException {
         Scanner simScanner = new Scanner(simFile);
         String IDs = simScanner.nextLine();
 
@@ -121,79 +121,56 @@ public class SerialManager implements SerialPortEventListener {
 
         int index = 0;
 
+        try {
+            wss.start();
+        }
+        catch (IllegalStateException e) {
+            System.out.println("Server is already running!");
+        }
+
         while(simScanner.hasNextLine()) {
 
             String nextL = simScanner.nextLine();
             telemetry.clear();
             String[] lineArray = nextL.split(",");
 
-            try {
-                for(int colIndex = 0; colIndex < idArray.length; colIndex++) {
-                    switch(idArray[colIndex]) {
-                        case "AccelX":
-                            int accel_X = Integer.parseInt(lineArray[colIndex]);
-                            telemetry.put("AccelX", accel_X);
-                            break;
-                        case "AccelY":
-                            int accel_Y = Integer.parseInt(lineArray[colIndex]);
-                            telemetry.put("AccelZ", accel_Y);
-                            break;
-                        case "AccelZ":
-                            int accel_Z = Integer.parseInt(lineArray[colIndex]);
-                            telemetry.put("AccelY", accel_Z);
-                            break;
-                        case "GyroX":
-                            int gyro_X = Integer.parseInt(lineArray[colIndex]);
-                            telemetry.put("GyroX", gyro_X); // these are flipped for testing
-                            break;
-                        case "GyroY":
-                            int gyro_Y = Integer.parseInt(lineArray[colIndex]);
-                            telemetry.put("GyroY", gyro_Y); //
-                            break;
-                        case "GyroZ":
-                            int gyro_Z = Integer.parseInt(lineArray[colIndex]);
-                            telemetry.put("GyroZ", gyro_Z); // its on purpose, trust me!
-                            break;
-                        case "Altitude":
-                            float altitude = Float.parseFloat(lineArray[colIndex]);
-                            telemetry.put("Altitude", altitude);
-                            break;
-                        case "Temperature":
-                            float temperature = Float.parseFloat(lineArray[colIndex]);
-                            telemetry.put("Temperature", temperature);
-                            break;
-                        case "State":
-                            int state = Integer.parseInt(lineArray[colIndex]);
-                            telemetry.put("State", state);
-                            break;
-                        case "Timestamp":
-                            int time = Integer.parseUnsignedInt(lineArray[colIndex]);
-                            telemetry.put("Timestamp", time);
-                            break;
-                        default:
-                            float out = Float.parseFloat(lineArray[colIndex]);
-                            telemetry.put(idArray[colIndex], out);
-                    }
+            for(int i=0; i < lineArray.length; i++) {
+                String lineData = lineArray[i].replaceAll("\"(.*?)\"", "$1");
+                String idData = idArray[i].replaceAll("\"(.*?)\"", "$1");
+                if(isInteger(lineData)) {
+                    int intData = Integer.parseInt(lineData);
+
+                    telemetry.put(idData, intData);
+                } else if(isFloat(lineData)) {
+                    float floatData = Float.parseFloat(lineData);
+
+                    telemetry.put(idData, floatData);
+                } else {
+
+                    telemetry.put(idData, lineData);
                 }
-
-                String telemetryJson = mapper.writeValueAsString(telemetry);
-
-                wss.broadcast(telemetryJson);
-            } catch(NumberFormatException e) {
-
             }
+
+            telemetry.put("RocketConnected", true);
+
+            String telemetryJson = mapper.writeValueAsString(telemetry);
+            wss.broadcast(telemetryJson);
 
             Thread.sleep(100);
 
         }
-        Thread.sleep(1000);
-        doStream(simFile);
+        if(forever)
+            doStream(simFile);
     }
 
-    /**
-     * Starts serial stream and updates telemetry hashmap
-     * @throws IOException Throws an error if comport cannot carry out request
-     */
+    private synchronized void doStream(File simFile) throws IOException, InterruptedException {
+        doStream(simFile, false);
+    }
+
+        /**
+         * Starts serial stream and updates telemetry hashmap
+         * @throws IOException Throws an error if comport cannot carry out request
+         */
     public synchronized void startStream() throws IOException, InterruptedException {
         HashSet<CommPortIdentifier> h = getAvailableSerialPorts();
 
@@ -224,47 +201,7 @@ public class SerialManager implements SerialPortEventListener {
 
                 File simFile = new File(fileNameLine);
                 if(simFile.exists()) {
-                    wss.start();
-
-                    logger.info(IDs);
-                    String[] idArray = IDs.split(",");
-
-                    int index = 0;
-
-                    wss.start();
-
-                    while(wss.getConnections().size() < 1);
-                    while(simScanner.hasNextLine()) {
-
-                        String nextL = simScanner.nextLine();
-                        telemetry.clear();
-                        String[] lineArray = nextL.split(",");
-
-                        for(int i=0; i < lineArray.length; i++) {
-                            String lineData = lineArray[i].replaceAll("\"(.*?)\"", "$1");
-                            String idData = idArray[i].replaceAll("\"(.*?)\"", "$1");
-                            if(isInteger(lineData)) {
-                                int intData = Integer.parseInt(lineData);
-
-                                telemetry.put(idData, intData);
-                            } else if(isFloat(lineData)) {
-                                float floatData = Float.parseFloat(lineData);
-
-                                telemetry.put(idData, floatData);
-                            } else {
-
-                                telemetry.put(idData, lineData);
-                            }
-                        }
-
-                        telemetry.put("RocketConnected", true);
-
-                        String telemetryJson = mapper.writeValueAsString(telemetry);
-                        wss.broadcast(telemetryJson);
-
-                        Thread.sleep(100);
-
-                    }
+                    doStream(simFile, true);
                 }
                 
 
