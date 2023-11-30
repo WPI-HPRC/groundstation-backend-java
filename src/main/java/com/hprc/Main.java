@@ -1,20 +1,24 @@
 package com.hprc;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.hprc.serial.DataTypes;
 import com.hprc.serial.SerialManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.awt.*;
-import java.io.Console;
-import java.io.FileReader;
-
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 public class Main {
+
+    private static ArrayList<Integer> toAsciiList(String str) {
+        ArrayList<Integer> list = new ArrayList<>();
+
+        for (char character : str.toCharArray()) {
+            list.add((int)character);
+        }
+        return list;
+    }
+
     private static final Logger logger = LoggerFactory.getLogger("Groundstation");
     private static SerialManager serial = null;
     private static int disconnectedCount = 0;
@@ -33,20 +37,20 @@ public class Main {
         serial.setBaudRate(115200); //Set baudrate for serial communications
         serial.enableLogging(); //Start logging at baudrate set earlier
 
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(65,67,88)), "AccelX", DataTypes.FLOAT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(65,67,89)), "AccelY", DataTypes.FLOAT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(65,67,90)), "AccelZ", DataTypes.FLOAT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(71,89,88)), "GyroX", DataTypes.FLOAT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(71,89,89)), "GyroY", DataTypes.FLOAT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(71,89,90)), "GyroZ", DataTypes.FLOAT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(65,76,84)), "Altitude", DataTypes.FLOAT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(83,84,84)), "State", DataTypes.UNSIGNED_INT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(84,83,80)), "Timestamp", DataTypes.UNSIGNED_INT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(84,77,80)), "Temperature", DataTypes.SIGNED_INT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(86, 76, 84)), "Voltage", DataTypes.FLOAT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(86, 69, 76)), "Velocity", DataTypes.SIGNED_INT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(65, 82, 66)), "AirbrakesDeploy", DataTypes.UNSIGNED_INT);
-        serial.addIdentifier(new ArrayList<>(Arrays.asList(69,78,68,66)), "EndByte", DataTypes.IGNORE);
+        serial.addIdentifier(toAsciiList("ACX"), "AccelX", DataTypes.FLOAT);
+        serial.addIdentifier(toAsciiList("ACY"), "AccelY", DataTypes.FLOAT);
+        serial.addIdentifier(toAsciiList("ACZ"), "AccelZ", DataTypes.FLOAT);
+        serial.addIdentifier(toAsciiList("GYX"), "GyroX", DataTypes.FLOAT);
+        serial.addIdentifier(toAsciiList("GYY"), "GyroY", DataTypes.FLOAT);
+        serial.addIdentifier(toAsciiList("GYZ"), "GyroZ", DataTypes.FLOAT);
+        serial.addIdentifier(toAsciiList("ALT"), "Altitude", DataTypes.FLOAT);
+        serial.addIdentifier(toAsciiList("STT"), "State", DataTypes.UNSIGNED_INT);
+        serial.addIdentifier(toAsciiList("TSP"), "Timestamp", DataTypes.UNSIGNED_INT);
+        serial.addIdentifier(toAsciiList("TMP"), "Temperature", DataTypes.SIGNED_INT);
+        serial.addIdentifier(toAsciiList("VLT"), "Voltage", DataTypes.FLOAT);
+        serial.addIdentifier(toAsciiList("VEL"), "Velocity", DataTypes.SIGNED_INT);
+        serial.addIdentifier(toAsciiList("ARB"), "AirbrakesDeploy", DataTypes.UNSIGNED_INT);
+        serial.addIdentifier(toAsciiList("ENDB"), "EndByte", DataTypes.IGNORE);
 
         serial.startStream(); // Start serial stream for receiver
 
