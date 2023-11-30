@@ -204,7 +204,7 @@ public class SerialManager implements SerialPortEventListener {
 
                 File simFile = new File(fileNameLine);
                 if(simFile.exists()) {
-                    doStream(simFile, true);
+                    doStream(simFile);
                 }
                 
 
