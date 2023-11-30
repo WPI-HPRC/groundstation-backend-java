@@ -13,6 +13,7 @@ import java.io.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @SuppressWarnings({"unused", "rawtypes", "SuspiciousMethodCalls"})
@@ -225,7 +226,45 @@ public class SerialManager implements SerialPortEventListener {
                 if(simFile.exists()) {
                     wss.start();
 
-                    doStream(simFile);
+                    logger.info(IDs);
+                    String[] idArray = IDs.split(",");
+
+                    int index = 0;
+
+                    wss.start();
+
+                    while(wss.getConnections().size() < 1);
+                    while(simScanner.hasNextLine()) {
+
+                        String nextL = simScanner.nextLine();
+                        telemetry.clear();
+                        String[] lineArray = nextL.split(",");
+
+                        for(int i=0; i < lineArray.length; i++) {
+                            String lineData = lineArray[i].replaceAll("\"(.*?)\"", "$1");
+                            String idData = idArray[i].replaceAll("\"(.*?)\"", "$1");
+                            if(isInteger(lineData)) {
+                                int intData = Integer.parseInt(lineData);
+
+                                telemetry.put(idData, intData);
+                            } else if(isFloat(lineData)) {
+                                float floatData = Float.parseFloat(lineData);
+
+                                telemetry.put(idData, floatData);
+                            } else {
+
+                                telemetry.put(idData, lineData);
+                            }
+                        }
+
+                        telemetry.put("RocketConnected", true);
+
+                        String telemetryJson = mapper.writeValueAsString(telemetry);
+                        wss.broadcast(telemetryJson);
+
+                        Thread.sleep(100);
+
+                    }
                 }
                 
 
@@ -451,5 +490,23 @@ public class SerialManager implements SerialPortEventListener {
                 .sorted(Map.Entry.comparingByValue())
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e2,
                         LinkedHashMap::new));
+    }
+
+    public static boolean isInteger(String s) {
+        try {
+            Integer.parseInt(s);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    public static boolean isFloat(String s) {
+        try {
+            Float.parseFloat(s);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 }
