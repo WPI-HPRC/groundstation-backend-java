@@ -109,16 +109,71 @@ public class SerialManager implements SerialPortEventListener {
      */
     public void getConfig() {
         logger.info("Identifiers");
-        for(Identifier ident : identifiers) {
+        for (Identifier ident : identifiers) {
             logger.info(String.format("%s - %s - %s", ident.name, ident.identifierBytes, ident.dataType));
         }
         logger.info(String.format("Baud Rate: %s", baudRate));
     }
 
-    /**
-     * Starts serial stream and updates telemetry hashmap
-     * @throws IOException Throws an error if comport cannot carry out request
-     */
+    private synchronized void doStream(File simFile, boolean forever) throws IOException, InterruptedException {
+        Scanner simScanner = new Scanner(simFile);
+        String IDs = simScanner.nextLine();
+
+        logger.info(IDs);
+        String[] idArray = IDs.split(",");
+
+        int index = 0;
+
+        try {
+            wss.start();
+        }
+        catch (IllegalStateException e) {
+            System.out.println("Server is already running!");
+        }
+
+        while(simScanner.hasNextLine()) {
+
+            String nextL = simScanner.nextLine();
+            telemetry.clear();
+            String[] lineArray = nextL.split(",");
+
+            for(int i=0; i < lineArray.length; i++) {
+                String lineData = lineArray[i].replaceAll("\"(.*?)\"", "$1");
+                String idData = idArray[i].replaceAll("\"(.*?)\"", "$1");
+                if(isInteger(lineData)) {
+                    int intData = Integer.parseInt(lineData);
+
+                    telemetry.put(idData, intData);
+                } else if(isFloat(lineData)) {
+                    float floatData = Float.parseFloat(lineData);
+
+                    telemetry.put(idData, floatData);
+                } else {
+
+                    telemetry.put(idData, lineData);
+                }
+            }
+
+            telemetry.put("RocketConnected", true);
+
+            String telemetryJson = mapper.writeValueAsString(telemetry);
+            wss.broadcast(telemetryJson);
+
+            Thread.sleep(100);
+
+        }
+        if(forever)
+            doStream(simFile);
+    }
+
+    private synchronized void doStream(File simFile) throws IOException, InterruptedException {
+        doStream(simFile, false);
+    }
+
+        /**
+         * Starts serial stream and updates telemetry hashmap
+         * @throws IOException Throws an error if comport cannot carry out request
+         */
     public synchronized void startStream() throws IOException, InterruptedException {
         HashSet<CommPortIdentifier> h = getAvailableSerialPorts();
 
