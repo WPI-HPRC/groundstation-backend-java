@@ -108,10 +108,88 @@ public class SerialManager implements SerialPortEventListener {
      */
     public void getConfig() {
         logger.info("Identifiers");
-        for(Identifier ident : identifiers) {
+        for (Identifier ident : identifiers) {
             logger.info(String.format("%s - %s - %s", ident.name, ident.identifierBytes, ident.dataType));
         }
         logger.info(String.format("Baud Rate: %s", baudRate));
+    }
+
+    private synchronized void doStream(File simFile) throws IOException, InterruptedException {
+        Scanner simScanner = new Scanner(simFile);
+        String IDs = simScanner.nextLine();
+
+        logger.info(IDs);
+        String[] idArray = IDs.split(",");
+
+        int index = 0;
+
+        while(simScanner.hasNextLine()) {
+
+            String nextL = simScanner.nextLine();
+            telemetry.clear();
+            String[] lineArray = nextL.split(",");
+
+            try {
+                for(int colIndex = 0; colIndex < idArray.length; colIndex++) {
+                    switch(idArray[colIndex]) {
+                        case "AccelX":
+                            int accel_X = Integer.parseInt(lineArray[colIndex]);
+                            telemetry.put("AccelX", accel_X);
+                            break;
+                        case "AccelY":
+                            int accel_Y = Integer.parseInt(lineArray[colIndex]);
+                            telemetry.put("AccelZ", accel_Y);
+                            break;
+                        case "AccelZ":
+                            int accel_Z = Integer.parseInt(lineArray[colIndex]);
+                            telemetry.put("AccelY", accel_Z);
+                            break;
+                        case "GyroX":
+                            int gyro_X = Integer.parseInt(lineArray[colIndex]);
+                            telemetry.put("GyroX", gyro_X); // these are flipped for testing
+                            break;
+                        case "GyroY":
+                            int gyro_Y = Integer.parseInt(lineArray[colIndex]);
+                            telemetry.put("GyroY", gyro_Y); //
+                            break;
+                        case "GyroZ":
+                            int gyro_Z = Integer.parseInt(lineArray[colIndex]);
+                            telemetry.put("GyroZ", gyro_Z); // its on purpose, trust me!
+                            break;
+                        case "Altitude":
+                            float altitude = Float.parseFloat(lineArray[colIndex]);
+                            telemetry.put("Altitude", altitude);
+                            break;
+                        case "Temperature":
+                            float temperature = Float.parseFloat(lineArray[colIndex]);
+                            telemetry.put("Temperature", temperature);
+                            break;
+                        case "State":
+                            int state = Integer.parseInt(lineArray[colIndex]);
+                            telemetry.put("State", state);
+                            break;
+                        case "Timestamp":
+                            int time = Integer.parseUnsignedInt(lineArray[colIndex]);
+                            telemetry.put("Timestamp", time);
+                            break;
+                        default:
+                            float out = Float.parseFloat(lineArray[colIndex]);
+                            telemetry.put(idArray[colIndex], out);
+                    }
+                }
+
+                String telemetryJson = mapper.writeValueAsString(telemetry);
+
+                wss.broadcast(telemetryJson);
+            } catch(NumberFormatException e) {
+
+            }
+
+            Thread.sleep(100);
+
+        }
+        Thread.sleep(1000);
+        doStream(simFile);
     }
 
     /**
@@ -148,86 +226,9 @@ public class SerialManager implements SerialPortEventListener {
 
                 File simFile = new File(fileNameLine);
                 if(simFile.exists()) {
-                    Scanner simScanner = new Scanner(simFile);
-                    String IDs = simScanner.nextLine();
+                    wss.start();
 
-                    logger.info(IDs);
-                    String[] idArray = IDs.split(",");
-
-                    int index = 0;
-
-                    wss.start();                
-                    while(simScanner.hasNextLine()) {
-
-                        String nextL = simScanner.nextLine();
-                        telemetry.clear();
-                        String[] lineArray = nextL.split(",");
-                    
-                        try {
-                            for(int colIndex = 0; colIndex < idArray.length; colIndex++) {
-                                switch(idArray[colIndex]) {
-                                    case "AccelX":
-                                        int accel_X = Integer.parseInt(lineArray[colIndex]);
-                                        telemetry.put("AccelX", accel_X);
-                                        break;
-                                    case "AccelY":
-                                        int accel_Y = Integer.parseInt(lineArray[colIndex]);
-                                        telemetry.put("AccelZ", accel_Y);
-                                        break;
-                                    case "AccelZ":
-                                        int accel_Z = Integer.parseInt(lineArray[colIndex]);
-                                        telemetry.put("AccelY", accel_Z);
-                                        break;
-                                    case "GyroX":
-                                        int gyro_X = Integer.parseInt(lineArray[colIndex]);
-                                        telemetry.put("GyroX", gyro_X); // these are flipped for testing
-                                        break;    
-                                    case "GyroY":
-                                        int gyro_Y = Integer.parseInt(lineArray[colIndex]);
-                                        telemetry.put("GyroY", gyro_Y); // 
-                                        break;
-                                    case "GyroZ":
-                                        int gyro_Z = Integer.parseInt(lineArray[colIndex]);
-                                        telemetry.put("GyroZ", gyro_Z); // its on purpose, trust me!
-                                        break;    
-                                    case "Altitude":
-                                        float altitude = Float.parseFloat(lineArray[colIndex]);
-                                        telemetry.put("Altitude", altitude);
-                                        break;    
-                                    case "Temperature":
-                                        float temperature = Float.parseFloat(lineArray[colIndex]);
-                                        telemetry.put("Temperature", temperature);
-                                        break;
-                                    case "State":
-                                        int state = Integer.parseInt(lineArray[colIndex]);
-                                        telemetry.put("State", state);
-                                        break;
-                                    case "Timestamp":
-                                        int time = Integer.parseUnsignedInt(lineArray[colIndex]);
-                                        telemetry.put("Timestamp", time);
-                                        break;
-                                    default:
-                                        float out = Float.parseFloat(lineArray[colIndex]);
-                                        telemetry.put(idArray[colIndex], out);
-                                }
-                            }
-
-    
-    
-    
-    
-    
-    
-                            String telemetryJson = mapper.writeValueAsString(telemetry);
-    
-                            wss.broadcast(telemetryJson);
-                        } catch(NumberFormatException e) {
-
-                        }
-                    
-                    Thread.sleep(10);
-
-                }
+                    doStream(simFile);
                 }
                 
 
