@@ -136,11 +136,13 @@ public class SerialManager implements SerialPortEventListener {
 
         int index = 0;
 
-        try {
-            wss.start();
-        }
-        catch (IllegalStateException e) {
-            System.out.println("Server is already running!");
+        if (!serverSocket.isOpen()) {
+            try {
+                System.out.println("Starting server.");
+                wss.start();
+            } catch (IllegalStateException e) {
+                System.out.println("Server is already running!");
+            }
         }
 
         while(simScanner.hasNextLine()) {
