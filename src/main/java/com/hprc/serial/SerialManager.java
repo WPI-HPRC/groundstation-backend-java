@@ -68,7 +68,10 @@ public class SerialManager implements SerialPortEventListener {
         telemetry.put("RocketConnected", 0);
 
         serverSocket = new SocketClient(new URI(
-                "ws://130.215.209.134:8000"));
+                "ws://130.215.209.134:8000"), new HashMap<>() {{
+                    put("backend-password", "PASSWORD");
+        }});
+        serverSocket.connect();
     }
 
     /**
@@ -167,6 +170,7 @@ public class SerialManager implements SerialPortEventListener {
 
             String telemetryJson = mapper.writeValueAsString(telemetry);
             wss.broadcast(telemetryJson);
+            serverSocket.send(telemetryJson);
 
             Thread.sleep(100);
 
@@ -176,7 +180,7 @@ public class SerialManager implements SerialPortEventListener {
     }
 
     private synchronized void doStream(File simFile) throws IOException, InterruptedException {
-        doStream(simFile, false);
+        doStream(simFile, true);
     }
 
         /**
