@@ -8,12 +8,12 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 
-public class TelemetryServer extends WebSocketServer {
+public class InternalServer extends WebSocketServer {
 
     private final Logger logger = LoggerFactory.getLogger("Telemetry Server");
     public boolean isRunning;
 
-    public TelemetryServer(int port) {
+    public InternalServer(int port) {
         super(new InetSocketAddress(port));
     }
 
@@ -41,5 +41,11 @@ public class TelemetryServer extends WebSocketServer {
     public void onStart() {
         broadcast("Welcome to the server!");
         this.isRunning = true;
+    }
+
+    @Override
+    public void stop() throws InterruptedException {
+        super.stop();
+        this.isRunning = false;
     }
 }

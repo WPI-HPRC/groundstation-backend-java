@@ -1,5 +1,6 @@
 package com.hprc;
 
+import java.net.ConnectException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
@@ -27,7 +28,7 @@ public class SocketClient extends WebSocketClient {
 
     @Override
     public void onOpen(ServerHandshake handshakedata) {
-//        System.out.println("opened connection");
+        System.out.println("Connected to server");
         // if you plan to refuse connection based on ip or httpfields overload: onWebsocketHandshakeReceivedAsClient
     }
 
@@ -39,12 +40,21 @@ public class SocketClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         // The close codes are documented in class org.java_websocket.framing.CloseFrame
-        System.out.println("Connection with server closed");
+        if (code == -1) {
+//            System.out.println("Failed to connect to server");
+        }
+        else if (code == 1006) {
+            System.out.println("Connection closed, telemetry server probably shut down.");
+        }
+        else {
+            System.out.println("Connection with server closed. " + "Code: " + code + " Reason: " + reason);
+        }
     }
 
     @Override
     public void onError(Exception ex) {
-        ex.printStackTrace();
-        // if the error is fatal then onClose will be called additionally
+        if (ex.getClass() != ConnectException.class) {
+            ex.printStackTrace();
+        }
     }
 }

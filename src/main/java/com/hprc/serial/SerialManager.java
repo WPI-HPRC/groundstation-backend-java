@@ -2,7 +2,7 @@ package com.hprc.serial;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hprc.TelemetryServer;
+import com.hprc.InternalServer;
 import com.opencsv.CSVWriter;
 import gnu.io.*;
 import org.slf4j.Logger;
@@ -15,7 +15,6 @@ import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.hprc.SocketClient;
@@ -40,9 +39,11 @@ public class SerialManager implements SerialPortEventListener {
     CSVWriter csvWriter;
     private final ObjectMapper mapper;
 
-    private final TelemetryServer wss;
+    private final InternalServer wss;
 
     private final SocketClient serverSocket;
+    boolean shouldAttemptToReconnectToServer = true;
+
 
     public SerialManager() throws IOException, URISyntaxException {
 
@@ -61,18 +62,38 @@ public class SerialManager implements SerialPortEventListener {
 
         mapper = new ObjectMapper();
 
-        wss = new TelemetryServer(3005);
+        wss = new InternalServer(3005);
 
         Identifier connectedIdentifier = new Identifier(new ArrayList<>(Arrays.asList(82, 79, 67, 75)), "RocketConnected", DataTypes.IGNORE);
         identifiers.add(connectedIdentifier);
         telemetry.put("RocketConnected", 0);
 
+
         serverSocket = new SocketClient(new URI(
                 "ws://130.215.209.134:8000"), new HashMap<>() {{
                     put("backend-password", "PASSWORD");
         }});
-        serverSocket.connect();
+
+        try {
+            serverSocket.connect();
+        }
+        catch (Exception e) {
+            System.out.println("Failed to connect to server, error: " + e);
+        }
+
+        Thread serverReconnectThread = new Thread(() -> {
+            while (shouldAttemptToReconnectToServer) {
+                try {
+                    attemptServerReconnect();
+                } catch (InterruptedException e) {
+                    System.out.println("Exception in server reconnection");
+                }
+            }
+        });
+        serverReconnectThread.start();
     }
+
+
 
     /**
      * Configuration method to set baud rate speed
@@ -127,6 +148,27 @@ public class SerialManager implements SerialPortEventListener {
         logger.info(String.format("Baud Rate: %s", baudRate));
     }
 
+    private void attemptServerReconnect() throws InterruptedException {
+        if (!serverSocket.isOpen()) {
+//            System.out.println("Attempting to reconnect to server");
+            try {
+                serverSocket.reconnectBlocking();
+            } catch (Exception e) {
+                System.out.println("Failed to reconnect to server: " + e);
+            }
+        }
+        else {
+            if(wss.isRunning) {
+                wss.stop();
+                System.out.println("Internal server shut down, now connected to telemetry server");
+            }
+        }
+        Thread.sleep(5000);
+        if (shouldAttemptToReconnectToServer) {
+            attemptServerReconnect();
+        }
+    }
+
     private synchronized void doStream(File simFile, boolean forever) throws IOException, InterruptedException {
         Scanner simScanner = new Scanner(simFile);
         String IDs = simScanner.nextLine();
@@ -138,10 +180,10 @@ public class SerialManager implements SerialPortEventListener {
 
         if (!serverSocket.isOpen()) {
             try {
-                System.out.println("Starting server.");
+                System.out.println("Starting internal server.");
                 wss.start();
             } catch (IllegalStateException e) {
-                System.out.println("Server is already running!");
+                System.out.println("Internal server is already running!");
             }
         }
 
@@ -174,7 +216,9 @@ public class SerialManager implements SerialPortEventListener {
             if (serverSocket.isOpen()) {
                 serverSocket.send(telemetryJson);
             }
-            wss.broadcast(telemetryJson);
+            else if (wss.isRunning) {
+                wss.broadcast(telemetryJson);
+            }
 
             Thread.sleep(100);
 

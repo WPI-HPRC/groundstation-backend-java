@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 
+// C:\Users\willf\Downloads\tl1d.csv
+
 public class Main {
 
     private static ArrayList<Integer> toAsciiList(String str) {
