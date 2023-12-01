@@ -10,11 +10,15 @@ import org.slf4j.LoggerFactory;
 
 import com.hprc.Conversion;
 import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import com.hprc.SocketClient;
 
 @SuppressWarnings({"unused", "rawtypes", "SuspiciousMethodCalls"})
 public class SerialManager implements SerialPortEventListener {
@@ -38,7 +42,9 @@ public class SerialManager implements SerialPortEventListener {
 
     private final TelemetryServer wss;
 
-    public SerialManager() throws IOException {
+    private final SocketClient serverSocket;
+
+    public SerialManager() throws IOException, URISyntaxException {
 
         identifiers =  new ArrayList<>();
         telemetry = new HashMap<>();
@@ -60,6 +66,9 @@ public class SerialManager implements SerialPortEventListener {
         Identifier connectedIdentifier = new Identifier(new ArrayList<>(Arrays.asList(82, 79, 67, 75)), "RocketConnected", DataTypes.IGNORE);
         identifiers.add(connectedIdentifier);
         telemetry.put("RocketConnected", 0);
+
+        serverSocket = new SocketClient(new URI(
+                "ws://130.215.209.134:8000"));
     }
 
     /**
