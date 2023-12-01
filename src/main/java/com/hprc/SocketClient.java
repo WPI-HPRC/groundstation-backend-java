@@ -39,9 +39,7 @@ public class SocketClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         // The close codes are documented in class org.java_websocket.framing.CloseFrame
-        System.out.println(
-                "Connection closed by " + (remote ? "remote peer" : "us") + " Code: " + code + " Reason: "
-                        + reason);
+        System.out.println("Connection with server closed");
     }
 
     @Override

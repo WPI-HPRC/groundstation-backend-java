@@ -171,8 +171,10 @@ public class SerialManager implements SerialPortEventListener {
             telemetry.put("RocketConnected", true);
 
             String telemetryJson = mapper.writeValueAsString(telemetry);
+            if (serverSocket.isOpen()) {
+                serverSocket.send(telemetryJson);
+            }
             wss.broadcast(telemetryJson);
-            serverSocket.send(telemetryJson);
 
             Thread.sleep(100);
 
