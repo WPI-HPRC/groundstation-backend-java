@@ -93,7 +93,12 @@ public class SerialManager implements SerialPortEventListener {
         serverReconnectThread.start();
     }
 
-
+    private void sendData(String telemetryJson) {
+        wss.broadcast(telemetryJson);
+        if(this.serverSocket.isOpen()) {
+            this.serverSocket.send(telemetryJson);
+        }
+    }
 
     /**
      * Configuration method to set baud rate speed
@@ -150,17 +155,10 @@ public class SerialManager implements SerialPortEventListener {
 
     private void attemptServerReconnect() throws InterruptedException {
         if (!serverSocket.isOpen()) {
-//            System.out.println("Attempting to reconnect to server");
             try {
                 serverSocket.reconnectBlocking();
             } catch (Exception e) {
                 System.out.println("Failed to reconnect to server: " + e);
-            }
-        }
-        else {
-            if(wss.isRunning) {
-                wss.stop();
-                System.out.println("Internal server shut down, now connected to telemetry server");
             }
         }
         Thread.sleep(5000);
@@ -178,13 +176,11 @@ public class SerialManager implements SerialPortEventListener {
 
         int index = 0;
 
-        if (!serverSocket.isOpen()) {
-            try {
-                System.out.println("Starting internal server.");
-                wss.start();
-            } catch (IllegalStateException e) {
-                System.out.println("Internal server is already running!");
-            }
+        try {
+            System.out.println("Starting internal server.");
+            wss.start();
+        } catch (IllegalStateException e) {
+            System.out.println("Internal server is already running!");
         }
 
         while(simScanner.hasNextLine()) {
@@ -212,13 +208,7 @@ public class SerialManager implements SerialPortEventListener {
 
             telemetry.put("RocketConnected", true);
 
-            String telemetryJson = mapper.writeValueAsString(telemetry);
-            if (serverSocket.isOpen()) {
-                serverSocket.send(telemetryJson);
-            }
-            else if (wss.isRunning) {
-                wss.broadcast(telemetryJson);
-            }
+            this.sendData(mapper.writeValueAsString(telemetry));
 
             Thread.sleep(100);
 
@@ -326,8 +316,6 @@ public class SerialManager implements SerialPortEventListener {
         } catch(Exception e) {
             logger.error(e.toString());
         }
-
-        wss.start();
     }
 
     /**
@@ -453,9 +441,7 @@ public class SerialManager implements SerialPortEventListener {
 
                 //System.out.println(telemetry);
 
-                String telemetryJson = mapper.writeValueAsString(telemetry);
-
-                wss.broadcast(telemetryJson);
+                this.sendData(mapper.writeValueAsString(telemetry));
 
                 if(loggingEnabled) {
                     writeTelemetry();
@@ -483,8 +469,7 @@ public class SerialManager implements SerialPortEventListener {
     }
 
     public synchronized void manualPushTelemetry() throws JsonProcessingException {
-        String telemetryJson = mapper.writeValueAsString(telemetry);
-        wss.broadcast(telemetryJson);
+        this.sendData(mapper.writeValueAsString(telemetry));
     }
 
     /**
