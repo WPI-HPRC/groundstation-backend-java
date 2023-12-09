@@ -1,8 +1,8 @@
 package com.hprc.serial;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hprc.TelemetryServer;
+import com.hprc.InternalServer;
 import com.opencsv.CSVWriter;
 import gnu.io.*;
 import org.slf4j.Logger;
@@ -10,11 +10,14 @@ import org.slf4j.LoggerFactory;
 
 import com.hprc.Conversion;
 import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import com.hprc.SocketClient;
 
 @SuppressWarnings({"unused", "rawtypes", "SuspiciousMethodCalls"})
 public class SerialManager implements SerialPortEventListener {
@@ -36,9 +39,13 @@ public class SerialManager implements SerialPortEventListener {
     CSVWriter csvWriter;
     private final ObjectMapper mapper;
 
-    private final TelemetryServer wss;
+    private final InternalServer wss;
 
-    public SerialManager() throws IOException {
+    private final SocketClient serverSocket;
+    boolean shouldAttemptToReconnectToServer = true;
+
+
+    public SerialManager() throws IOException, URISyntaxException {
 
         identifiers =  new ArrayList<>();
         telemetry = new HashMap<>();
@@ -55,11 +62,42 @@ public class SerialManager implements SerialPortEventListener {
 
         mapper = new ObjectMapper();
 
-        wss = new TelemetryServer(3005);
+        wss = new InternalServer(3005);
 
         Identifier connectedIdentifier = new Identifier(new ArrayList<>(Arrays.asList(82, 79, 67, 75)), "RocketConnected", DataTypes.IGNORE);
         identifiers.add(connectedIdentifier);
         telemetry.put("RocketConnected", 0);
+
+
+        serverSocket = new SocketClient(new URI(
+                "ws://130.215.209.134:8000"), new HashMap<>() {{
+                    put("backend-password", "PASSWORD");
+        }});
+
+        try {
+            serverSocket.connect();
+        }
+        catch (Exception e) {
+            System.out.println("Failed to connect to server, error: " + e);
+        }
+
+        Thread serverReconnectThread = new Thread(() -> {
+            while (shouldAttemptToReconnectToServer) {
+                try {
+                    attemptServerReconnect();
+                } catch (InterruptedException e) {
+                    System.out.println("Exception in server reconnection");
+                }
+            }
+        });
+        serverReconnectThread.start();
+    }
+
+    private void sendData(String telemetryJson) {
+        wss.broadcast(telemetryJson);
+        if(this.serverSocket.isOpen()) {
+            this.serverSocket.send(telemetryJson);
+        }
     }
 
     /**
@@ -115,6 +153,20 @@ public class SerialManager implements SerialPortEventListener {
         logger.info(String.format("Baud Rate: %s", baudRate));
     }
 
+    private void attemptServerReconnect() throws InterruptedException {
+        if (!serverSocket.isOpen()) {
+            try {
+                serverSocket.reconnectBlocking();
+            } catch (Exception e) {
+                System.out.println("Failed to reconnect to server: " + e);
+            }
+        }
+        Thread.sleep(5000);
+        if (shouldAttemptToReconnectToServer) {
+            attemptServerReconnect();
+        }
+    }
+
     private synchronized void doStream(File simFile, boolean forever) throws IOException, InterruptedException {
         Scanner simScanner = new Scanner(simFile);
         String IDs = simScanner.nextLine();
@@ -125,10 +177,10 @@ public class SerialManager implements SerialPortEventListener {
         int index = 0;
 
         try {
+            System.out.println("Starting internal server.");
             wss.start();
-        }
-        catch (IllegalStateException e) {
-            System.out.println("Server is already running!");
+        } catch (IllegalStateException e) {
+            System.out.println("Internal server is already running!");
         }
 
         while(simScanner.hasNextLine()) {
@@ -156,8 +208,7 @@ public class SerialManager implements SerialPortEventListener {
 
             telemetry.put("RocketConnected", true);
 
-            String telemetryJson = mapper.writeValueAsString(telemetry);
-            wss.broadcast(telemetryJson);
+            this.sendData(mapper.writeValueAsString(telemetry));
 
             Thread.sleep(100);
 
@@ -167,7 +218,7 @@ public class SerialManager implements SerialPortEventListener {
     }
 
     private synchronized void doStream(File simFile) throws IOException, InterruptedException {
-        doStream(simFile, false);
+        doStream(simFile, true);
     }
 
         /**
@@ -204,46 +255,7 @@ public class SerialManager implements SerialPortEventListener {
 
                 File simFile = new File(fileNameLine);
                 if(simFile.exists()) {
-                    Scanner simScanner = new Scanner(simFile);
-                    String IDs = simScanner.nextLine();
-
-                    logger.info(IDs);
-                    String[] idArray = IDs.split(",");
-
-                    int index = 0;
-
-                    wss.start();                
-                    while(simScanner.hasNextLine()) {
-
-                        String nextL = simScanner.nextLine();
-                        telemetry.clear();
-                        String[] lineArray = nextL.split(",");
-
-                        for(int i=0; i < lineArray.length; i++) {
-                            String lineData = lineArray[i].replaceAll("\"(.*?)\"", "$1");
-                            String idData = idArray[i].replaceAll("\"(.*?)\"", "$1");
-                            if(isInteger(lineData)) {
-                                int intData = Integer.parseInt(lineData);
-
-                                telemetry.put(idData, intData);
-                            } else if(isFloat(lineData)) {
-                                float floatData = Float.parseFloat(lineData);
-
-                                telemetry.put(idData, floatData);
-                            } else {
-
-                                telemetry.put(idData, lineData);
-                            }
-                        }
-
-                        telemetry.put("RocketConnected", true);
-
-                        String telemetryJson = mapper.writeValueAsString(telemetry);
-                        wss.broadcast(telemetryJson);
-
-                        Thread.sleep(100);
-
-                    }
+                    doStream(simFile);
                 }
                 
 
@@ -304,8 +316,6 @@ public class SerialManager implements SerialPortEventListener {
         } catch(Exception e) {
             logger.error(e.toString());
         }
-
-        wss.start();
     }
 
     /**
@@ -431,9 +441,7 @@ public class SerialManager implements SerialPortEventListener {
 
                 //System.out.println(telemetry);
 
-                String telemetryJson = mapper.writeValueAsString(telemetry);
-
-                wss.broadcast(telemetryJson);
+                this.sendData(mapper.writeValueAsString(telemetry));
 
                 if(loggingEnabled) {
                     writeTelemetry();
@@ -461,8 +469,7 @@ public class SerialManager implements SerialPortEventListener {
     }
 
     public synchronized void manualPushTelemetry() throws JsonProcessingException {
-        String telemetryJson = mapper.writeValueAsString(telemetry);
-        wss.broadcast(telemetryJson);
+        this.sendData(mapper.writeValueAsString(telemetry));
     }
 
     /**

@@ -1,0 +1,60 @@
+package com.hprc;
+
+import java.net.ConnectException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Map;
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.drafts.Draft;
+import org.java_websocket.handshake.ServerHandshake;
+
+/**
+ * This example demonstrates how to create a websocket connection to a server. Only the most
+ * important callbacks are overloaded.
+ */
+public class SocketClient extends WebSocketClient {
+
+    public SocketClient(URI serverUri, Draft draft) {
+        super(serverUri, draft);
+    }
+
+    public SocketClient(URI serverURI) {
+        super(serverURI);
+    }
+
+    public SocketClient(URI serverUri, Map<String, String> httpHeaders) {
+        super(serverUri, httpHeaders);
+    }
+
+    @Override
+    public void onOpen(ServerHandshake handshakedata) {
+        System.out.println("Connected to server");
+        // if you plan to refuse connection based on ip or httpfields overload: onWebsocketHandshakeReceivedAsClient
+    }
+
+    @Override
+    public void onMessage(String message) {
+        System.out.println("received: " + message);
+    }
+
+    @Override
+    public void onClose(int code, String reason, boolean remote) {
+        // The close codes are documented in class org.java_websocket.framing.CloseFrame
+        if (code == -1) {
+//            System.out.println("Failed to connect to server");
+        }
+        else if (code == 1006) {
+            System.out.println("Connection closed, telemetry server probably shut down.");
+        }
+        else {
+            System.out.println("Connection with server closed. " + "Code: " + code + " Reason: " + reason);
+        }
+    }
+
+    @Override
+    public void onError(Exception ex) {
+        if (ex.getClass() != ConnectException.class) {
+            ex.printStackTrace();
+        }
+    }
+}

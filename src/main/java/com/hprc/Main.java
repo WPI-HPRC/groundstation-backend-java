@@ -6,7 +6,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
+
+// C:\Users\willf\Downloads\tl1d.csv
 
 public class Main {
 
@@ -26,7 +29,7 @@ public class Main {
     static {
         try {
             serial = new SerialManager();
-        } catch (IOException e) {
+        } catch (IOException | URISyntaxException e) {
             logger.error(e.toString());
         }
     }
